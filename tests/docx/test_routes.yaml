@@ -1,0 +1,26 @@
+# Test route configuration for real DOCX files
+# Each key is a filename or glob pattern mapping to a TestFlow.
+#
+# Processor fields:
+#   parser: registered parser name (e.g., python-docx, pandoc)
+#   recognizer: registered recognizer name (e.g., regex, router)
+#   semantic_tools: (optional) list of semantic tools to run after primary recognition
+#
+# Top-level fields:
+#   expected_output_path: path to YAML file with expected output (relative to tests/docx/)
+#   assertion_mode: "partial" (check specified fields only) or "full" (exact match)
+
+test_1.docx:
+  processors:
+    - parser: python-docx
+      recognizer: regex
+      expected_output_path: expected/test_1_python-docx.yaml
+    - parser: markdownit
+      recognizer: regex
+      skip_if_no_pandoc: true
+      expected_output_path: expected/test_1_markdownit.yaml
+    - parser: mineru
+      recognizer: regex
+      skip_if_no_token: true
+      expected_output_path: expected/test_1_mineru.yaml
+  assertion_mode: partial

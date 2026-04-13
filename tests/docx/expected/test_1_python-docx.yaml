@@ -1,0 +1,84 @@
+# Expected output for test_1.docx processed by python-docx parser + regex recognizer
+# This is a partial assertion mode file - only specified fields are checked.
+
+block_count: 31
+
+block_types:
+  - text
+  - text
+  - text
+  - heading
+  - text
+  - heading
+  - text
+  - text
+  - text
+  - heading
+  - text
+  - text
+  - text
+  - text
+  - heading
+  - text
+  - text
+  - text
+  - heading
+  - text
+  - text
+  - text
+  - text
+  - text
+  - text
+  - text
+  - text
+  - heading
+  - text
+  - text
+  - text
+
+blocks:
+  "0":
+    type: text
+    content_contains:
+      - "什么是学习"
+  "3":
+    type: heading
+    content_contains:
+      - "摘要"
+    inline_elements:
+      - type: bold
+        index: 0
+        text: "摘要"
+  "5":
+    type: heading
+    content_contains:
+      - "背景"
+    inline_elements:
+      - type: bold
+        index: 0
+        text: "背景"
+  "9":
+    type: heading
+    content_contains:
+      - "历史"
+      - "柯尔莫哥"
+      - "复杂性"
+  "14":
+    type: heading
+    content_contains:
+      - "历史"
+      - "蔡廷"
+      - "随机性"
+  "18":
+    type: heading
+    content_contains:
+      - "所罗门诺夫归纳"
+      - "哲学"
+  "27":
+    type: heading
+    content_contains:
+      - "参考文献"
+    inline_elements:
+      - type: bold
+        index: 0
+        text: "\u00a0参考文献"

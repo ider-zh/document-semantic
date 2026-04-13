@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "title": "Sample Document",
+    "author": null,
+    "doc_type": null,
+    "source_path": null,
+    "extra": {}
+  },
+  "blocks": [
+    {
+      "id": "placeholder-title",
+      "type": "title",
+      "content": "Sample Document",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder-h1-1",
+      "type": "heading",
+      "level": 1,
+      "content": "Introduction",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder-text-1",
+      "type": "text",
+      "content": "This is a sample paragraph with **bold** and `code`.",
+      "inline_elements": [
+        {
+          "type": "bold",
+          "text": "bold",
+          "start_offset": 32,
+          "end_offset": 40
+        },
+        {
+          "type": "code_span",
+          "text": "code",
+          "start_offset": 46,
+          "end_offset": 52
+        }
+      ]
+    },
+    {
+      "id": "placeholder-h1-2",
+      "type": "heading",
+      "level": 1,
+      "content": "Conclusion",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder-text-2",
+      "type": "text",
+      "content": "The end.",
+      "inline_elements": []
+    }
+  ],
+  "attachments": []
+}

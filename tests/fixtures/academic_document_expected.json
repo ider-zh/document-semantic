@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0.0",
+  "metadata": {
+    "title": "Research Paper Title",
+    "author": null,
+    "doc_type": null,
+    "source_path": null,
+    "extra": {}
+  },
+  "blocks": [
+    {
+      "id": "placeholder",
+      "type": "title",
+      "content": "Research Paper Title",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "heading",
+      "level": 1,
+      "content": "Abstract",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "text",
+      "content": "This paper presents a novel approach to document semantic analysis using pipeline-based architectures.",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "heading",
+      "level": 1,
+      "content": "1. Introduction",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "text",
+      "content": "Background context here.",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "heading",
+      "level": 1,
+      "content": "2. Method",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "text",
+      "content": "Methodology description.",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "heading",
+      "level": 1,
+      "content": "References",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "text",
+      "content": "[1] Author A. Title of Paper. Journal, 2024.",
+      "inline_elements": []
+    },
+    {
+      "id": "placeholder",
+      "type": "text",
+      "content": "[2] Author B. Another Paper. Conference, 2023.",
+      "inline_elements": []
+    }
+  ],
+  "attachments": []
+}

@@ -1,0 +1,74 @@
+# Expected output for test_1.docx processed by mineru parser + regex recognizer
+# Generated from actual MinerU API extraction results with image extraction.
+# Note: Image blocks have style_hint "Image" but regex recognizer maps them to "text".
+
+block_count: 26
+
+block_types:
+  - heading
+  - text
+  - text
+  - heading
+  - text
+  - heading
+  - text
+  - text
+  - text
+  - text
+  - heading
+  - text
+  - code_block
+  - text
+  - heading
+  - text
+  - text
+  - text
+  - heading
+  - text
+  - list_item
+  - text
+  - text
+  - text
+  - heading
+  - list_item
+
+blocks:
+  "0":
+    type: heading
+    content_contains:
+      - "什么是学习"
+  "3":
+    type: heading
+    content_contains:
+      - "摘要"
+  "5":
+    type: heading
+    content_contains:
+      - "背景"
+  "7":
+    type: text
+    content_contains:
+      - "image"
+  "10":
+    type: heading
+    content_contains:
+      - "历史"
+      - "柯尔莫哥罗夫"
+  "14":
+    type: heading
+    content_contains:
+      - "历史"
+      - "蔡廷"
+  "16":
+    type: text
+    content_contains:
+      - "所罗门诺夫与蔡廷"
+  "18":
+    type: heading
+    content_contains:
+      - "所罗门诺夫归纳"
+      - "哲学"
+  "24":
+    type: heading
+    content_contains:
+      - "参考文献"
