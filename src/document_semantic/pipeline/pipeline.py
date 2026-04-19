@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import time
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from document_semantic.models.processor_output import ProcessorConfig, ProcessResult
 from document_semantic.models.semantic_document import SemanticDocument
 from document_semantic.observability.logger import get_logger
 from document_semantic.parsers.protocol import IntermediateResult, Parser
@@ -77,13 +79,23 @@ class Pipeline:
     def __init__(
         self,
         parser: Parser,
-        recognizer: SemanticRecognizer,
+        recognizer: Optional[SemanticRecognizer] = None,
         config: Optional[PipelineConfig] = None,
+        post_processor: Optional[SemanticRecognizer] = None,
     ):
         self._parser = parser
-        self._recognizer = recognizer
+        self._recognizer = recognizer  # Deprecated, kept for backward compatibility
         self._config = config or PipelineConfig()
         self._trace = PipelineTrace()
+        self._post_processor = post_processor  # Optional recognizer for post-processing
+
+        if recognizer is not None:
+            warnings.warn(
+                "The 'recognizer' parameter is deprecated and will be removed in a future version. "
+                "Use 'post_processor' instead for optional semantic enrichment.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     @classmethod
     def from_config(cls, config: PipelineConfig) -> Pipeline:
@@ -123,6 +135,114 @@ class Pipeline:
         logger.info(f"[pipeline] Pipeline complete: {len(semantic_doc.blocks)} blocks")
         return semantic_doc
 
+    def run_with_processor(
+        self,
+        docx_path: Path,
+        output_dir: Path,
+        config: Optional[ProcessorConfig] = None,
+    ) -> ProcessResult:
+        """Execute the processor workflow: parse -> process -> file output.
+
+        This is the new primary workflow that produces Markdown output with
+        XML placeholders, resource directory, and JSON mapping file.
+
+        Args:
+            docx_path: Path to the DOCX file.
+            output_dir: Directory to write output files to.
+            config: Processor configuration options.
+
+        Returns:
+            ProcessResult with paths to the generated files.
+        """
+        logger.info(f"[pipeline] Starting processor workflow for {docx_path}")
+        self._trace = PipelineTrace()  # Reset trace
+
+        # Stage 1: Parse
+        intermediate = self._parse(docx_path)
+
+        # Stage 2: Optional post-processing recognizer
+        if self._post_processor is not None:
+            logger.info("[pipeline] Running post-processor for semantic enrichment")
+            self._recognize(intermediate)
+
+        # Stage 3: Process to Markdown + resources
+        result = self._process_output(intermediate, docx_path, output_dir, config)
+
+        logger.info(
+            f"[pipeline] Processor workflow complete: "
+            f"md={result.markdown_path}, resources={result.resources_dir}"
+        )
+        return result
+
+    def _process_output(
+        self,
+        intermediate: IntermediateResult,
+        docx_path: Path,
+        output_dir: Path,
+        config: Optional[ProcessorConfig] = None,
+    ) -> ProcessResult:
+        """Execute the processor output generation stage."""
+        from document_semantic.utils.markdown_generator import MarkdownGenerator
+
+        if config is None:
+            config = ProcessorConfig()
+
+        logger.info("[pipeline:processor] stage started")
+        start = time.monotonic()
+        warnings_list: list[str] = []
+        errors: list[str] = []
+
+        try:
+            gen = MarkdownGenerator(
+                intermediate,
+                output_resources=config.output_resources,
+            )
+
+            rich_md_path, placeholder_md_path, resources_dir, json_path = gen.generate_both(
+                output_dir,
+                source_path=str(docx_path),
+                parser_name=self._parser.name,
+            )
+        except Exception as e:
+            elapsed = time.monotonic() - start
+            error_msg = f"Processor output generation failed: {e}"
+            logger.error(f"[pipeline:processor] {error_msg}")
+            errors.append(error_msg)
+            self._trace.add(
+                StageTrace(
+                    stage="processor",
+                    duration_seconds=elapsed,
+                    input_summary=str(docx_path),
+                    output_summary="FAILED",
+                    warnings=warnings_list,
+                    errors=errors,
+                )
+            )
+            raise
+
+        elapsed = time.monotonic() - start
+        summary = f"rich_md={rich_md_path}, placeholder_md={placeholder_md_path}, resources={resources_dir}, json={json_path}"
+        logger.info(f"[pipeline:processor] stage completed ({elapsed:.3f}s): {summary}")
+
+        self._trace.add(
+            StageTrace(
+                stage="processor",
+                duration_seconds=elapsed,
+                input_summary=str(docx_path),
+                output_summary=summary,
+                warnings=warnings_list,
+                errors=errors,
+            )
+        )
+
+        return ProcessResult(
+            rich_markdown_path=rich_md_path if config.output_markdown else None,
+            placeholder_markdown_path=placeholder_md_path if config.output_markdown else None,
+            resources_dir=resources_dir,
+            resources_json_path=json_path,
+            metadata=dict(intermediate.metadata),
+        )
+
     def _parse(self, docx_path: Path) -> IntermediateResult:
         """Execute the parsing stage."""
         logger.info("[pipeline:parsing] stage started")
@@ -131,7 +251,8 @@ class Pipeline:
         errors: list[str] = []
 
         try:
-            result = self._parser.parse(docx_path)
+            skip_image_ocr = getattr(self._config, "mineru_skip_image_ocr", False)
+            result = self._parser.parse(docx_path, skip_image_ocr=skip_image_ocr)
         except Exception as e:
             elapsed = time.monotonic() - start
             error_msg = f"Parser {self._parser.name} failed: {e}"

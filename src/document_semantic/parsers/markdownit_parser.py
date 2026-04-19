@@ -15,6 +15,7 @@ from pathlib import Path
 from markdown_it import MarkdownIt
 
 from document_semantic.observability.logger import get_logger
+from document_semantic.models.processor_output import ProcessorConfig, ProcessResult
 from document_semantic.parsers.protocol import (
     Attachment,
     IntermediateBlock,
@@ -24,6 +25,7 @@ from document_semantic.parsers.protocol import (
     ParserError,
 )
 from document_semantic.parsers.registry import ParserRegistry
+from document_semantic.utils.markdown_generator import MarkdownGenerator
 
 logger = get_logger(__name__)
 
@@ -73,7 +75,7 @@ class MarkdownitParser(Parser):
     def name(self) -> str:
         return "markdownit"
 
-    def parse(self, docx_path: Path) -> IntermediateResult:
+    def parse(self, docx_path: Path, skip_image_ocr: bool = False) -> IntermediateResult:
         """Parse a DOCX file using pandoc + markdown-it.
 
         Args:
@@ -150,6 +152,51 @@ class MarkdownitParser(Parser):
                 metadata={"source_path": str(docx_path)},
                 attachments=attachments,
             )
+
+    def process(
+        self,
+        docx_path: Path,
+        output_dir: Path,
+        config: ProcessorConfig | None = None,
+        skip_image_ocr: bool = False,
+    ) -> ProcessResult:
+        """Parse and process a DOCX file into rich Markdown + placeholder Markdown + resources.
+
+        Calls parse() internally, then uses MarkdownGenerator to produce both
+        rich Markdown output and placeholder Markdown with XML tags,
+        resource directory, and JSON mapping.
+
+        Args:
+            docx_path: Absolute path to the DOCX file.
+            output_dir: Directory to write output files to.
+            config: Processor configuration options.
+
+        Returns:
+            ProcessResult with paths to the generated files.
+        """
+        if config is None:
+            config = ProcessorConfig()
+
+        intermediate = self.parse(docx_path)
+
+        gen = MarkdownGenerator(
+            intermediate,
+            output_resources=config.output_resources,
+        )
+
+        rich_md_path, placeholder_md_path, resources_dir, json_path = gen.generate_both(
+            output_dir,
+            source_path=str(docx_path),
+            parser_name=self.name,
+        )
+
+        return ProcessResult(
+            rich_markdown_path=rich_md_path if config.output_markdown else None,
+            placeholder_markdown_path=placeholder_md_path if config.output_markdown else None,
+            resources_dir=resources_dir,
+            resources_json_path=json_path,
+            metadata=dict(intermediate.metadata),
+        )
 
     def _tokens_to_blocks(
         self, tokens: list, media_dir: Path

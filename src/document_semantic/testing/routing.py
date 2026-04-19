@@ -41,7 +41,12 @@ class ProcessorConfig:
     semantic_tools: list[SemanticToolConfig] = field(default_factory=list)
     skip_if_no_pandoc: bool = False
     skip_if_no_token: bool = False
+    skip_image_ocr: bool = False
     expected_output_path: Optional[str] = None
+    # Output generation settings (default to True for manual inspection)
+    output_markdown: bool = True
+    output_resources: bool = True
+    output_json_mapping: bool = True
 
 
 @dataclass
@@ -195,7 +200,11 @@ def _parse_processors(raw: list[Any]) -> list[ProcessorConfig]:
                     semantic_tools=tools,
                     skip_if_no_pandoc=item.get("skip_if_no_pandoc", False),
                     skip_if_no_token=item.get("skip_if_no_token", False),
+                    skip_image_ocr=item.get("skip_image_ocr", False),
                     expected_output_path=item.get("expected_output_path"),
+                    output_markdown=item.get("output_markdown", True),
+                    output_resources=item.get("output_resources", True),
+                    output_json_mapping=item.get("output_json_mapping", True),
                 )
             )
     return processors

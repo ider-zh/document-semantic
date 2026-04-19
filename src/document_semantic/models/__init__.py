@@ -22,6 +22,7 @@ from .inline_elements import (
     LinkInlineElement,
     StrikethroughInlineElement,
 )
+from .processor_output import ProcessorConfig, ProcessResult, ResourceEntry
 from .semantic_document import Attachment, DocumentMetadata, SchemaUpgrader, SemanticDocument
 
 __all__ = [
@@ -50,4 +51,8 @@ __all__ = [
     "DocumentMetadata",
     "SemanticDocument",
     "SchemaUpgrader",
+    # Processor output
+    "ProcessorConfig",
+    "ProcessResult",
+    "ResourceEntry",
 ]

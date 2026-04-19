@@ -69,11 +69,14 @@ class Parser(ABC):
     """
 
     @abstractmethod
-    def parse(self, docx_path: Path) -> IntermediateResult:
+    def parse(self, docx_path: Path, skip_image_ocr: bool = False) -> IntermediateResult:
         """Parse a DOCX file and produce an IntermediateResult.
 
         Args:
             docx_path: Absolute path to the DOCX file.
+            skip_image_ocr: If True, replace images with placeholders before
+                processing to prevent OCR extraction. Only supported by mineru parser;
+                other parsers ignore this flag.
 
         Returns:
             An IntermediateResult with blocks, metadata, and attachments.

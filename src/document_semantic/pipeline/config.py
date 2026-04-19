@@ -49,6 +49,12 @@ class PipelineConfig:
         log_level: Optional[str] = None,
         mineru_token: Optional[str] = None,
         mineru_cache_dir: Optional[str] = None,
+        mineru_skip_image_ocr: Optional[bool] = None,
+        # Processor output settings
+        output_markdown: Optional[bool] = None,
+        output_resources: Optional[bool] = None,
+        output_json_mapping: Optional[bool] = None,
+        use_xml_placeholders: Optional[bool] = None,
     ):
         self.parser = parser or DEFAULT_PARSER
         self.recognizer = recognizer or DEFAULT_RECOGNIZER
@@ -59,6 +65,12 @@ class PipelineConfig:
         # MinerU-specific settings: token from env, cache dir from env
         self.mineru_token = mineru_token or os.getenv("MINERU_TOKEN") or os.getenv("token_mineru")
         self.mineru_cache_dir = mineru_cache_dir or os.getenv("MINERU_CACHE_DIR") or ""
+        self.mineru_skip_image_ocr = mineru_skip_image_ocr or False
+        # Processor output settings (default to True)
+        self.output_markdown = output_markdown if output_markdown is not None else True
+        self.output_resources = output_resources if output_resources is not None else True
+        self.output_json_mapping = output_json_mapping if output_json_mapping is not None else True
+        self.use_xml_placeholders = use_xml_placeholders if use_xml_placeholders is not None else True
 
     @classmethod
     def load(cls, config_path: Optional[str | Path] = None) -> PipelineConfig:
@@ -87,6 +99,7 @@ class PipelineConfig:
         env_log_level = os.getenv("DOC_SEMANTIC_LOG_LEVEL")
         env_mineru_token = os.getenv("MINERU_TOKEN") or os.getenv("token_mineru")
         env_mineru_cache = os.getenv("MINERU_CACHE_DIR")
+        env_mineru_skip_image_ocr = os.getenv("MINERU_SKIP_IMAGE_OCR")
 
         return cls(
             parser=env_parser or raw.get("parser"),
@@ -97,6 +110,11 @@ class PipelineConfig:
             log_level=env_log_level or raw.get("log_level"),
             mineru_token=env_mineru_token or raw.get("mineru_token"),
             mineru_cache_dir=env_mineru_cache or raw.get("mineru_cache_dir"),
+            mineru_skip_image_ocr=_parse_bool(env_mineru_skip_image_ocr or raw.get("mineru_skip_image_ocr")),
+            output_markdown=raw.get("output_markdown"),
+            output_resources=raw.get("output_resources"),
+            output_json_mapping=raw.get("output_json_mapping"),
+            use_xml_placeholders=raw.get("use_xml_placeholders"),
         )
 
 
@@ -124,3 +142,14 @@ def _read_yaml(path: Path) -> dict[str, Any]:
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return data if isinstance(data, dict) else {}
+
+
+def _parse_bool(value: Any) -> bool | None:
+    """Parse a boolean value from string or config."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in ("true", "1", "yes", "on")
+    return bool(value)

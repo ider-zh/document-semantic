@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from document_semantic.models.processor_output import ProcessorConfig
 from document_semantic.models.semantic_document import SemanticDocument
 from document_semantic.parsers.protocol import (
     IntermediateResult,
@@ -26,7 +27,7 @@ from document_semantic.testing.assertions import (
     load_expected_output,
 )
 from document_semantic.testing.routing import (
-    ProcessorConfig,
+    ProcessorConfig as RouteProcessorConfig,
     TestFlow,
     load_routes,
     resolve_route,
@@ -35,6 +36,16 @@ from document_semantic.testing.routing import (
 
 DOCX_DIR = Path(__file__).parent / "docx"
 ROUTES_FILE = DOCX_DIR / "test_routes.yaml"
+OUTPUT_DIR = DOCX_DIR / "output"
+
+
+def _clean_output_dir(docx_name: str, processor_label: str) -> Path:
+    """Clean and return the output directory for a test case."""
+    output_path = OUTPUT_DIR / f"{docx_name}_{processor_label}"
+    if output_path.exists():
+        shutil.rmtree(output_path)
+    output_path.mkdir(parents=True, exist_ok=True)
+    return output_path
 
 
 def _collect_test_params():
@@ -97,6 +108,7 @@ def _build_pipeline(proc: ProcessorConfig) -> Pipeline:
         parser=proc.parser,
         recognizer=proc.recognizer,
         verbosity="summary",
+        mineru_skip_image_ocr=proc.skip_image_ocr if proc.skip_image_ocr else None,
     )
     return Pipeline.from_config(config)
 
@@ -121,33 +133,62 @@ def _run_semantic_tools(
 
 
 def _run_processor(
-    docx_path: Path, proc: ProcessorConfig
+    docx_path: Path, proc: RouteProcessorConfig
 ) -> dict[str, Any]:
     """Run a single processor configuration against a DOCX file.
 
+    Produces three output files: Markdown, resource directory, and JSON mapping.
     Returns a dict with: output (SemanticDocument), trace (PipelineTrace),
-    tool_results (list), and errors (list).
+    tool_results (list), errors (list), and output_files (dict).
     """
     errors = []
     tool_results = []
+    output_files = {}
 
     try:
+        # Build pipeline for semantic recognition
         pipeline = _build_pipeline(proc)
         semantic_doc = pipeline.run(docx_path)
         trace = pipeline.get_trace()
 
         # Run semantic tools on the intermediate result
-        # We need to re-parse to get intermediate for tools
         from document_semantic.parsers.registry import ParserRegistry
 
         parser = ParserRegistry.get(proc.parser)
-        intermediate = parser.parse(docx_path)
+        intermediate = parser.parse(docx_path, skip_image_ocr=proc.skip_image_ocr)
         tool_results = _run_semantic_tools(intermediate, proc.semantic_tools)
+
+        # Generate processor output (Markdown + resources + JSON mapping)
+        docx_name = docx_path.name.replace(".docx", "")
+        processor_label = f"{proc.parser}_{proc.recognizer}"
+        output_dir = _clean_output_dir(docx_name, processor_label)
+
+        processor_config = ProcessorConfig(
+            output_markdown=proc.output_markdown,
+            output_resources=proc.output_resources,
+            output_json_mapping=proc.output_json_mapping,
+            use_xml_placeholders=True,
+        )
+
+        result = parser.process(
+            docx_path, output_dir, processor_config, skip_image_ocr=proc.skip_image_ocr
+        )
+
+        # Track output files
+        if result.rich_markdown_path:
+            output_files["rich_markdown"] = result.rich_markdown_path
+        if result.placeholder_markdown_path:
+            output_files["placeholder_markdown"] = result.placeholder_markdown_path
+        if result.resources_dir:
+            output_files["resources"] = result.resources_dir
+        if result.resources_json_path:
+            output_files["json_mapping"] = result.resources_json_path
 
         return {
             "output": semantic_doc,
             "trace": trace,
             "tool_results": tool_results,
+            "output_files": output_files,
             "errors": errors,
         }
     except Exception as e:
@@ -156,6 +197,7 @@ def _run_processor(
             "output": None,
             "trace": None,
             "tool_results": [],
+            "output_files": output_files,
             "errors": errors,
         }
 

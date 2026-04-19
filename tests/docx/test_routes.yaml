@@ -15,6 +15,10 @@ test_1.docx:
     - parser: python-docx
       recognizer: regex
       expected_output_path: expected/test_1_python-docx.yaml
+    - parser: pandoc
+      recognizer: regex
+      skip_if_no_pandoc: true
+      expected_output_path: expected/test_1_pandoc.yaml
     - parser: markdownit
       recognizer: regex
       skip_if_no_pandoc: true
@@ -22,5 +26,26 @@ test_1.docx:
     - parser: mineru
       recognizer: regex
       skip_if_no_token: true
+      skip_image_ocr: true
       expected_output_path: expected/test_1_mineru.yaml
+  assertion_mode: partial
+
+test_2.docx:
+  processors:
+    - parser: python-docx
+      recognizer: regex
+      expected_output_path: expected/test_2_python-docx.yaml
+    - parser: pandoc
+      recognizer: regex
+      skip_if_no_pandoc: true
+      expected_output_path: expected/test_2_pandoc.yaml
+    - parser: markdownit
+      recognizer: regex
+      skip_if_no_pandoc: true
+      expected_output_path: expected/test_2_markdownit.yaml
+    - parser: mineru
+      recognizer: regex
+      skip_if_no_token: true
+      skip_image_ocr: true
+      expected_output_path: expected/test_2_mineru.yaml
   assertion_mode: partial
