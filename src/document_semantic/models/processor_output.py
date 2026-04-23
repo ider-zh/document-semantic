@@ -46,6 +46,9 @@ class ProcessResult:
     placeholder_markdown_path: Path | None = None
     """Path to the placeholder Markdown file with XML tags replacing special elements."""
 
+    content_list_json_path: Path | None = None
+    """Path to the enhanced content_list_v2.json file."""
+
     resources_dir: Path | None = None
     """Path to the resources directory."""
 
@@ -67,6 +70,8 @@ class ProcessResult:
             return self.placeholder_markdown_path.parent
         if self.rich_markdown_path:
             return self.rich_markdown_path.parent
+        if self.content_list_json_path:
+            return self.content_list_json_path.parent
         if self.resources_dir:
             return self.resources_dir.parent
         if self.resources_json_path:

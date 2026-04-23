@@ -497,13 +497,14 @@ class MinerUParser(Parser):
         images_dir = resources_dir / "images" if resources_dir else None
 
         converter = _MinerUContentConverter(docx_path, self.name, config.output_resources)
-        rich_md_path, placeholder_md_path, resources_dir, json_path = converter.convert(
+        rich_md_path, placeholder_md_path, resources_dir, json_path, content_list_path = converter.convert(
             zip_data, output_dir, images_dir
         )
 
         return ProcessResult(
             rich_markdown_path=rich_md_path if config.output_markdown else None,
             placeholder_markdown_path=placeholder_md_path if config.output_markdown else None,
+            content_list_json_path=content_list_path,
             resources_dir=resources_dir,
             resources_json_path=json_path,
             metadata={"source_path": str(docx_path), "parser": "mineru"},
@@ -1057,13 +1058,27 @@ class _MinerUContentConverter:
             "image": {},
         }
 
+    def _clean_item(self, item: dict) -> dict:
+        """Recursively remove bbox and other MinerU-specific metadata."""
+        cleaned = {}
+        for k, v in item.items():
+            if k in ("bbox", "score", "drop_reason", "group_id", "lines", "spans"):
+                continue
+            if isinstance(v, dict):
+                cleaned[k] = self._clean_item(v)
+            elif isinstance(v, list):
+                cleaned[k] = [self._clean_item(i) if isinstance(i, dict) else i for i in v]
+            else:
+                cleaned[k] = v
+        return cleaned
+
     def convert(
         self,
         zip_data: bytes,
         output_dir: Path,
         images_dir: Path | None,
-    ) -> tuple[Path, Path, Path | None, Path | None]:
-        """Convert content_list_v2.json from ZIP to both Markdown outputs."""
+    ) -> tuple[Path, Path, Path | None, Path | None, Path | None]:
+        """Convert content_list_v2.json from ZIP to both Markdown outputs and a cleaned JSON."""
         import zipfile as zf_module
 
         zf = zf_module.ZipFile(BytesIO(zip_data))
@@ -1104,13 +1119,18 @@ class _MinerUContentConverter:
         placeholder_path = output_dir / "output.md"
         placeholder_path.write_text("\n".join(placeholder_lines), encoding="utf-8")
 
+        # Save cleaned and aligned items to content_list.json
+        cleaned_items = [self._clean_item(item) for item in items]
+        content_list_path = output_dir / "content_list.json"
+        content_list_path.write_text(json.dumps(cleaned_items, indent=2, ensure_ascii=False), encoding="utf-8")
+
         # Write resources.json
         json_path = None
         resources_dir = output_dir / "resources" if self._output_resources else None
         if self._output_resources and resources_dir:
             json_path = self._write_resources_json(output_dir)
 
-        return rich_path, placeholder_path, resources_dir, json_path
+        return rich_path, placeholder_path, resources_dir, json_path, content_list_path
 
     def _generate_markdown(
         self,

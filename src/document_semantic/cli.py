@@ -128,6 +128,8 @@ def process_pipeline(
             table.add_row("Resources", str(result.resources_dir))
         if result.resources_json_path:
             table.add_row("JSON Mapping", str(result.resources_json_path))
+        if result.content_list_json_path:
+            table.add_row("Content JSON", str(result.content_list_json_path))
 
         console.print(table)
 

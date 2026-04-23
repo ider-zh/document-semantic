@@ -235,6 +235,7 @@ class Pipeline:
         return ProcessResult(
             rich_markdown_path=rich_md_path if config.output_markdown else None,
             placeholder_markdown_path=placeholder_md_path if config.output_markdown else None,
+            content_list_json_path=None,  # Handled by parser itself for MinerU
             resources_dir=resources_dir,
             resources_json_path=json_path,
             metadata=dict(intermediate.metadata),
