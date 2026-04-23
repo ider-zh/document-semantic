@@ -88,7 +88,7 @@ class DocxAligner:
                 item["_docx_id"] = best_id
                 docx_idx = best_id
 
-        # 2. Group by docx_id
+        # 2. Group by docx_id and merge consecutive lists
         out_items = []
         current_group = []
         current_docx_id = None
@@ -108,6 +108,15 @@ class DocxAligner:
                     out_items.append(self._merge_and_restore(current_group, current_docx_id))
                     current_group = []
                     current_docx_id = None
+
+                # Special handling for consecutive lists of same type
+                if item.get("type") == "list" and out_items and out_items[-1].get("type") == "list":
+                    prev_list_type = out_items[-1].get("content", {}).get("list_type")
+                    curr_list_type = item.get("content", {}).get("list_type")
+                    if curr_list_type == prev_list_type:
+                        out_items[-1]["content"]["list_items"].extend(item.get("content", {}).get("list_items", []))
+                        continue
+
                 out_items.append(item)
 
         if current_group:

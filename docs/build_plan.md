@@ -99,3 +99,8 @@ intermediate_result.json 作为前一版本的输出结果, 相比 content_list_
 
 
 # 7
+content_list_v2.json 的结构是什么? 需要定义一个数据class表示, 后续不同的业务开发需要扩展内容
+
+以下是计划开发的模块:
+1. 语言映射模块, 提供  
+将 title, abstract, conclusion, reference 等从 content_list_v2 中的 head1 中提取出来
