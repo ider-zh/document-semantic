@@ -49,3 +49,11 @@ class TestInspectionOutput:
         assert result.content_list_json_path.exists()
         assert (output_dir / "output.md").exists()
         assert (output_dir / "content_list.json").exists()
+
+        # Validate with Pydantic model
+        import json
+        from document_semantic.models.mineru_content import MinerUContentList
+        
+        with open(result.content_list_json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            MinerUContentList.model_validate(data)
