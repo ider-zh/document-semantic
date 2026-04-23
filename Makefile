@@ -68,7 +68,8 @@ test-parser:
 	$(PYTHON) -c " \
 	import sys; sys.stdout.reconfigure(encoding='utf-8'); \
 	from pathlib import Path; \
-	from document_semantic.pipeline import Pipeline, PipelineConfig; \
+	from document_semantic.pipelines.pipeline import Pipeline; \
+	from document_semantic.core.config import PipelineConfig; \
 	config = PipelineConfig.load(); \
 	pipeline = Pipeline.from_config(config); \
 	doc = Path('$(FILE)'); \
@@ -96,7 +97,8 @@ run-example:
 	$(PYTHON) -c " \
 	import sys; sys.stdout.reconfigure(encoding='utf-8'); \
 	from pathlib import Path; \
-	from document_semantic.pipeline import Pipeline, PipelineConfig; \
+	from document_semantic.pipelines.pipeline import Pipeline; \
+	from document_semantic.core.config import PipelineConfig; \
 	config = PipelineConfig(parser='python-docx', recognizer='regex', verbosity='preview'); \
 	pipeline = Pipeline.from_config(config); \
 	result = pipeline.run(Path('tests/fixtures/test_1.docx')); \

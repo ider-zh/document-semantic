@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, Optional
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .blocks import Block
-from .inline_elements import InlineElement
 
 CURRENT_SCHEMA_VERSION = "1.0.0"
 
@@ -20,7 +20,7 @@ class Attachment(BaseModel):
 
     id: str = Field(..., description="Unique attachment identifier")
     path: str = Field(..., description="File path or reference to the attachment")
-    mime_type: Optional[str] = Field(default=None, description="MIME type if known")
+    mime_type: str | None = Field(default=None, description="MIME type if known")
 
 
 class DocumentMetadata(BaseModel):
@@ -28,15 +28,11 @@ class DocumentMetadata(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    title: Optional[str] = Field(default=None, description="Document title")
-    author: Optional[str] = Field(default=None, description="Document author")
-    doc_type: Optional[str] = Field(
-        default=None, description="Document type hint (e.g., 'academic', 'report')"
-    )
-    source_path: Optional[str] = Field(default=None, description="Original file path")
-    extra: dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata fields"
-    )
+    title: str | None = Field(default=None, description="Document title")
+    author: str | None = Field(default=None, description="Document author")
+    doc_type: str | None = Field(default=None, description="Document type hint (e.g., 'academic', 'report')")
+    source_path: str | None = Field(default=None, description="Original file path")
+    extra: dict[str, Any] = Field(default_factory=dict, description="Additional metadata fields")
 
 
 class SemanticDocument(BaseModel):
@@ -49,15 +45,9 @@ class SemanticDocument(BaseModel):
         pattern=r"^\d+\.\d+\.\d+$",
         description="Schema version in semver format",
     )
-    metadata: DocumentMetadata = Field(
-        default_factory=DocumentMetadata, description="Document-level metadata"
-    )
-    blocks: list[Block] = Field(
-        default_factory=list, description="Ordered list of semantic blocks"
-    )
-    attachments: list[Attachment] = Field(
-        default_factory=list, description="Referenced attachments (images, etc.)"
-    )
+    metadata: DocumentMetadata = Field(default_factory=DocumentMetadata, description="Document-level metadata")
+    blocks: list[Block] = Field(default_factory=list, description="Ordered list of semantic blocks")
+    attachments: list[Attachment] = Field(default_factory=list, description="Referenced attachments (images, etc.)")
 
     def to_json(self, **kwargs: Any) -> str:
         """Serialize to JSON string with type discriminators preserved."""

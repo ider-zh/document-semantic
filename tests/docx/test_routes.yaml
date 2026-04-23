@@ -16,7 +16,7 @@ test_1.docx:
       recognizer: regex
       expected_output_path: expected/test_1_python-docx.yaml
     - parser: pandoc
-      recognizer: regex
+      recognizer: pandoc_agent
       skip_if_no_pandoc: true
       expected_output_path: expected/test_1_pandoc.yaml
     - parser: markdownit
@@ -36,7 +36,7 @@ test_2.docx:
       recognizer: regex
       expected_output_path: expected/test_2_python-docx.yaml
     - parser: pandoc
-      recognizer: regex
+      recognizer: pandoc_agent
       skip_if_no_pandoc: true
       expected_output_path: expected/test_2_pandoc.yaml
     - parser: markdownit

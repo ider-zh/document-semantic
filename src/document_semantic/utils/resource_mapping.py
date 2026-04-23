@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from .xml_placeholders import PositionType, ResourceType
 
 
 def build_resources_json(
     resources: dict[str, dict[str, dict[str, Any]]],
-    source_path: Optional[str] = None,
-    parser_name: Optional[str] = None,
-    output_dir: Optional[Path] = None,
+    source_path: str | None = None,
+    parser_name: str | None = None,
+    output_dir: Path | None = None,
 ) -> Path:
     """Build and write the resources.json mapping file.
 
@@ -38,7 +38,7 @@ def build_resources_json(
         "metadata": {
             "source_path": source_path or "",
             "parser": parser_name or "",
-            "processed_at": datetime.now(timezone.utc).isoformat(),
+            "processed_at": datetime.now(UTC).isoformat(),
         },
     }
 
@@ -71,10 +71,10 @@ class ResourceCollector:
     def add(
         self,
         resource_type: ResourceType,
-        content: Optional[str] = None,
-        file_path: Optional[str] = None,
+        content: str | None = None,
+        file_path: str | None = None,
         position_type: PositionType = PositionType.BLOCK,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> int:
         """Add a resource entry and return its assigned ID.
 
@@ -106,9 +106,7 @@ class ResourceCollector:
         entries[str(new_id)] = entry
         return new_id
 
-    def add_formula(
-        self, content: str, position_type: PositionType = PositionType.BLOCK
-    ) -> int:
+    def add_formula(self, content: str, position_type: PositionType = PositionType.BLOCK) -> int:
         """Add a formula resource."""
         return self.add(ResourceType.FORMULA, content=content, position_type=position_type)
 
@@ -116,22 +114,20 @@ class ResourceCollector:
         self,
         content: str,
         position_type: PositionType = PositionType.BLOCK,
-        language: Optional[str] = None,
+        language: str | None = None,
     ) -> int:
         """Add a code resource."""
         meta: dict[str, Any] = {}
         if language:
             meta["language"] = language
-        return self.add(
-            ResourceType.CODE, content=content, position_type=position_type, metadata=meta
-        )
+        return self.add(ResourceType.CODE, content=content, position_type=position_type, metadata=meta)
 
     def add_image(
         self,
         file_path: str,
-        content: Optional[str] = None,
+        content: str | None = None,
         position_type: PositionType = PositionType.BLOCK,
-        metadata: Optional[dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> int:
         """Add an image resource."""
         return self.add(
@@ -149,8 +145,8 @@ class ResourceCollector:
     def write_json(
         self,
         output_dir: Path,
-        source_path: Optional[str] = None,
-        parser_name: Optional[str] = None,
+        source_path: str | None = None,
+        parser_name: str | None = None,
     ) -> Path:
         """Write the collected resources to resources.json."""
         return build_resources_json(

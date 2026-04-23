@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -48,10 +48,37 @@ class AbstractBlock(BaseBlock):
     type: Literal["abstract"] = "abstract"
 
 
+class AbstractHeadBlock(BaseBlock):
+    """Heading for the abstract section."""
+
+    type: Literal["abstract_head"] = "abstract_head"
+    level: int = Field(default=1, ge=1, le=6, description="Heading level")
+
+
+class ConclusionBlock(BaseBlock):
+    """Document conclusion section."""
+
+    type: Literal["conclusion"] = "conclusion"
+
+
+class ConclusionHeadBlock(BaseBlock):
+    """Heading for the conclusion section."""
+
+    type: Literal["conclusion_head"] = "conclusion_head"
+    level: int = Field(default=1, ge=1, le=6, description="Heading level")
+
+
 class ReferenceBlock(BaseBlock):
     """Reference/bibliography entry."""
 
     type: Literal["reference"] = "reference"
+
+
+class ReferenceHeadBlock(BaseBlock):
+    """Heading for the references section."""
+
+    type: Literal["reference_head"] = "reference_head"
+    level: int = Field(default=1, ge=1, le=6, description="Heading level")
 
 
 class ListItemBlock(BaseBlock):
@@ -76,7 +103,25 @@ class CodeBlock(BaseBlock):
     """Code block (multi-line code)."""
 
     type: Literal["code_block"] = "code_block"
-    language: Optional[str] = Field(default=None, description="Programming language hint")
+    language: str | None = Field(default=None, description="Programming language hint")
+
+
+class ImageBlock(BaseBlock):
+    """Image block."""
+
+    type: Literal["image"] = "image"
+
+
+class ImageDescriptionBlock(BaseBlock):
+    """Text describing an image."""
+
+    type: Literal["image_description"] = "image_description"
+
+
+class TableDescriptionBlock(BaseBlock):
+    """Text describing a table."""
+
+    type: Literal["table_description"] = "table_description"
 
 
 # Discriminated union of all block types
@@ -85,10 +130,17 @@ Block = Annotated[
     | HeadingBlock
     | TextBlock
     | AbstractBlock
+    | AbstractHeadBlock
+    | ConclusionBlock
+    | ConclusionHeadBlock
     | ReferenceBlock
+    | ReferenceHeadBlock
     | ListItemBlock
     | TableBlock
-    | CodeBlock,
+    | CodeBlock
+    | ImageBlock
+    | ImageDescriptionBlock
+    | TableDescriptionBlock,
     Field(discriminator="type"),
 ]
 
@@ -98,9 +150,16 @@ __all__ = [
     "HeadingBlock",
     "TextBlock",
     "AbstractBlock",
+    "AbstractHeadBlock",
+    "ConclusionBlock",
+    "ConclusionHeadBlock",
     "ReferenceBlock",
+    "ReferenceHeadBlock",
     "ListItemBlock",
     "TableBlock",
     "CodeBlock",
+    "ImageBlock",
+    "ImageDescriptionBlock",
+    "TableDescriptionBlock",
     "Block",
 ]

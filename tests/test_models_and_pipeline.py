@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
+from document_semantic.core.config import Settings
 from document_semantic.models.blocks import (
     HeadingBlock,
     TextBlock,
@@ -17,16 +16,13 @@ from document_semantic.models.inline_elements import (
     LinkInlineElement,
 )
 from document_semantic.models.semantic_document import (
+    CURRENT_SCHEMA_VERSION,
     Attachment,
     DocumentMetadata,
     SchemaUpgrader,
     SemanticDocument,
-    CURRENT_SCHEMA_VERSION,
 )
-from document_semantic.parsers.protocol import IntermediateBlock, IntermediateResult
-from document_semantic.pipeline import Pipeline, PipelineConfig, PipelineTrace
-from document_semantic.recognizers.regex_recognizer import RegexRecognizer
-
+from document_semantic.pipelines.pipeline import Pipeline
 
 # ---------------------------------------------------------------------------
 # Model creation and serialization tests
@@ -110,9 +106,7 @@ class TestSemanticDocument:
 
     def test_discriminator_preserved_in_json(self):
         """JSON serialization preserves type discriminators."""
-        doc = SemanticDocument(
-            blocks=[TitleBlock(content="Title"), HeadingBlock(level=2, content="Sub")]
-        )
+        doc = SemanticDocument(blocks=[TitleBlock(content="Title"), HeadingBlock(level=2, content="Sub")])
         data = json.loads(doc.to_json())
         assert data["blocks"][0]["type"] == "title"
         assert data["blocks"][1]["type"] == "heading"
@@ -128,6 +122,7 @@ class TestSchemaUpgrader:
 
     def test_register_and_list(self):
         """Upgraders can be registered and listed."""
+
         @SchemaUpgrader.register("1.0.0", "2.0.0")
         class TestUpgrader(SchemaUpgrader):
             def upgrade(self, doc: SemanticDocument) -> SemanticDocument:
@@ -138,6 +133,7 @@ class TestSchemaUpgrader:
 
     def test_upgrade_execution(self):
         """Registered upgrader performs the migration."""
+
         @SchemaUpgrader.register("1.0.0", "test-upgrade")
         class VersionUpgrader(SchemaUpgrader):
             def upgrade(self, doc: SemanticDocument) -> SemanticDocument:
@@ -161,7 +157,7 @@ class TestPipelineIntegration:
 
     def test_full_pipeline_roundtrip(self, sample_docx_path):
         """Full pipeline: parse -> recognize -> serialize -> deserialize."""
-        config = PipelineConfig(parser="python-docx", recognizer="regex")
+        config = Settings(parser="python-docx", recognizer="regex")
         pipeline = Pipeline.from_config(config)
         result = pipeline.run(sample_docx_path)
 
@@ -176,7 +172,7 @@ class TestPipelineIntegration:
 
     def test_pipeline_trace(self, sample_docx_path):
         """Pipeline captures trace entries."""
-        config = PipelineConfig(parser="python-docx", recognizer="regex")
+        config = Settings(parser="python-docx", recognizer="regex")
         pipeline = Pipeline.from_config(config)
         pipeline.run(sample_docx_path)
 
@@ -194,7 +190,7 @@ class TestPipelineIntegration:
 
     def test_pipeline_trace_summary(self, sample_docx_path):
         """Trace summary is human-readable."""
-        config = PipelineConfig(parser="python-docx", recognizer="regex")
+        config = Settings(parser="python-docx", recognizer="regex")
         pipeline = Pipeline.from_config(config)
         pipeline.run(sample_docx_path)
 
@@ -205,9 +201,7 @@ class TestPipelineIntegration:
 
     def test_pipeline_verbosity_summary(self, sample_docx_path, caplog):
         """Summary verbosity shows block counts only."""
-        config = PipelineConfig(
-            parser="python-docx", recognizer="regex", verbosity="summary"
-        )
+        config = Settings(parser="python-docx", recognizer="regex", verbosity="summary")
         pipeline = Pipeline.from_config(config)
         result = pipeline.run(sample_docx_path)
         pipeline.print_result(result)
@@ -226,7 +220,8 @@ class TestObservability:
 
     def test_logger_configurable(self):
         """Logger respects configured log level."""
-        from document_semantic.observability.logger import get_logger
+        from document_semantic.core.logger import get_logger
+
         logger = get_logger("test")
         # Logger should be callable and produce output
         assert logger is not None

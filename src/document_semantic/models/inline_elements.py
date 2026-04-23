@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,12 +14,8 @@ class BaseInlineElement(BaseModel):
 
     type: str = Field(..., description="Element type discriminator")
     text: str = Field(..., description="The raw text content of this element")
-    start_offset: int = Field(
-        ..., ge=0, description="Character offset where this element starts in the parent block"
-    )
-    end_offset: int = Field(
-        ..., ge=0, description="Character offset where this element ends in the parent block"
-    )
+    start_offset: int = Field(..., ge=0, description="Character offset where this element starts in the parent block")
+    end_offset: int = Field(..., ge=0, description="Character offset where this element ends in the parent block")
 
 
 class BoldInlineElement(BaseInlineElement):

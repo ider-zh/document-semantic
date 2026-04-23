@@ -1,0 +1,33 @@
+# Pipeline Configuration
+# Possible values: python-docx, pandoc, markdownit, mineru
+parser: python-docx
+
+# Possible values: regex, llm, router
+recognizer: regex
+
+# Possible values: summary, preview, full
+verbosity: preview
+
+# Possible values: DEBUG, INFO, WARNING, ERROR
+log_level: INFO
+
+# Processor output settings
+output_markdown: true
+output_resources: true
+output_json_mapping: true
+use_xml_placeholders: true
+
+# MinerU-specific settings
+# mineru_token: your_token_here
+mineru_cache_dir: ./.mineru_cache
+# mineru_skip_image_ocr: false
+
+# Recognizer-specific config
+recognizer_config: {}
+
+# Suppress specific warnings
+suppress_warnings: []
+
+recognizer_model_id: 'qwen3.5-9b'
+# recognizer_model_id: 'minimax-m2.7'
+recognizer_model_provider_url: 'https://api.toop.ai/v1'

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -29,8 +29,8 @@ class ResourceEntry:
     """A single resource entry in the mapping file."""
 
     entry_type: str  # "formula", "code", "image"
-    content: Optional[str] = None  # For inline resources (formula, code)
-    file_path: Optional[str] = None  # For binary resources (images)
+    content: str | None = None  # For inline resources (formula, code)
+    file_path: str | None = None  # For binary resources (images)
     position_type: str = "block"  # "block" or "inline"
     metadata: dict[str, Any] = field(default_factory=dict)
     """Additional metadata (language for code, dimensions for images, etc.)."""
@@ -40,28 +40,28 @@ class ResourceEntry:
 class ProcessResult:
     """Result returned by a parser's process() method."""
 
-    rich_markdown_path: Optional[Path] = None
+    rich_markdown_path: Path | None = None
     """Path to the rich Markdown file with full content (formulas, code, images in markdown format)."""
 
-    placeholder_markdown_path: Optional[Path] = None
+    placeholder_markdown_path: Path | None = None
     """Path to the placeholder Markdown file with XML tags replacing special elements."""
 
-    resources_dir: Optional[Path] = None
+    resources_dir: Path | None = None
     """Path to the resources directory."""
 
-    resources_json_path: Optional[Path] = None
+    resources_json_path: Path | None = None
     """Path to the resources.json mapping file."""
 
     metadata: dict[str, Any] = field(default_factory=dict)
     """Document-level metadata and processing info."""
 
     @property
-    def markdown_path(self) -> Optional[Path]:
+    def markdown_path(self) -> Path | None:
         """Alias for placeholder_markdown_path for backward compatibility."""
         return self.placeholder_markdown_path
 
     @property
-    def output_dir(self) -> Optional[Path]:
+    def output_dir(self) -> Path | None:
         """Return the output directory containing all artifacts."""
         if self.placeholder_markdown_path:
             return self.placeholder_markdown_path.parent

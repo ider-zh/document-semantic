@@ -5,13 +5,12 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import Any
 
 import pytest
 
+from document_semantic.agents.regex_recognizer import RegexRecognizer
 from document_semantic.models.semantic_document import SemanticDocument
-from document_semantic.parsers.python_docx_parser import PythonDocxParser
-from document_semantic.recognizers.regex_recognizer import RegexRecognizer
+from document_semantic.services.parsers.python_docx_parser import PythonDocxParser
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -103,8 +102,7 @@ def academic_docx_path(fixtures_dir: Path, tmp_path: Path) -> Path:
     doc.add_heading("Research Paper Title", level=0)
     doc.add_paragraph("Abstract")
     doc.add_paragraph(
-        "This paper presents a novel approach to document semantic analysis "
-        "using pipeline-based architectures."
+        "This paper presents a novel approach to document semantic analysis using pipeline-based architectures."
     )
     doc.add_heading("1. Introduction", level=1)
     doc.add_paragraph("Background context here.")

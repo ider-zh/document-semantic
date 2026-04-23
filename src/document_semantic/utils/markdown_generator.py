@@ -10,9 +10,8 @@ from __future__ import annotations
 import re
 import shutil
 from pathlib import Path
-from typing import Optional
 
-from document_semantic.parsers.protocol import Attachment, IntermediateBlock, IntermediateResult
+from document_semantic.services.parsers.protocol import Attachment, IntermediateBlock, IntermediateResult
 
 from .resource_mapping import ResourceCollector
 from .xml_placeholders import (
@@ -43,9 +42,9 @@ class MarkdownGenerator:
     def generate_both(
         self,
         output_dir: Path,
-        source_path: Optional[str] = None,
-        parser_name: Optional[str] = None,
-    ) -> tuple[Path, Path, Optional[Path], Optional[Path]]:
+        source_path: str | None = None,
+        parser_name: str | None = None,
+    ) -> tuple[Path, Path, Path | None, Path | None]:
         """Generate both rich and placeholder Markdown files, resource directory, and resources.json.
 
         Args:
@@ -75,18 +74,16 @@ class MarkdownGenerator:
         # Write resources.json (from placeholder collector)
         json_path = None
         if self._output_resources and resources_dir:
-            json_path = placeholder_collector.write_json(
-                output_dir, source_path=source_path, parser_name=parser_name
-            )
+            json_path = placeholder_collector.write_json(output_dir, source_path=source_path, parser_name=parser_name)
 
         return rich_path, placeholder_path, resources_dir, json_path
 
     def generate(
         self,
         output_dir: Path,
-        source_path: Optional[str] = None,
-        parser_name: Optional[str] = None,
-    ) -> tuple[Path, Optional[Path], Optional[Path]]:
+        source_path: str | None = None,
+        parser_name: str | None = None,
+    ) -> tuple[Path, Path | None, Path | None]:
         """Generate Markdown file, resource directory, and resources.json (legacy method).
 
         Args:
@@ -107,15 +104,13 @@ class MarkdownGenerator:
 
         json_path = None
         if self._output_resources and resources_dir:
-            json_path = self._collector.write_json(
-                output_dir, source_path=source_path, parser_name=parser_name
-            )
+            json_path = self._collector.write_json(output_dir, source_path=source_path, parser_name=parser_name)
 
         return md_path, resources_dir, json_path
 
     def _build_markdown(
         self,
-        images_dir: Optional[Path],
+        images_dir: Path | None,
         collector: ResourceCollector,
         use_placeholders: bool = True,
     ) -> list[str]:
@@ -128,7 +123,11 @@ class MarkdownGenerator:
         return lines
 
     def _process_block(
-        self, block: IntermediateBlock, images_dir: Optional[Path], collector: ResourceCollector, use_placeholders: bool = True
+        self,
+        block: IntermediateBlock,
+        images_dir: Path | None,
+        collector: ResourceCollector,
+        use_placeholders: bool = True,
     ) -> list[str]:
         """Process a single IntermediateBlock into Markdown lines."""
         style_hint = block.style_hint or ""
@@ -190,7 +189,7 @@ class MarkdownGenerator:
         return []
 
     def _process_inline(
-        self, text: str, images_dir: Optional[Path], collector: ResourceCollector, use_placeholders: bool = True
+        self, text: str, images_dir: Path | None, collector: ResourceCollector, use_placeholders: bool = True
     ) -> str:
         """Process inline elements within text content."""
         if not use_placeholders:
@@ -198,14 +197,14 @@ class MarkdownGenerator:
 
         # Replace inline formulas: $...$ or $$...$$
         text = re.sub(
-            r'\$([^$\n]+?)\$',
+            r"\$([^$\n]+?)\$",
             lambda m: self._inline_formula_replacer(m, collector),
             text,
         )
 
         # Replace inline code spans: `...`
         text = re.sub(
-            r'`([^`\n]+?)`',
+            r"`([^`\n]+?)`",
             lambda m: self._inline_code_replacer(m, collector),
             text,
         )
@@ -213,8 +212,8 @@ class MarkdownGenerator:
         # Replace inline LaTeX formulas: \mathsf{...}, \sum, etc.
         # Match LaTeX commands with optional spaces before braces
         latex_formula_pattern = re.compile(
-            r'((?:\\(?:mathsf|mathbf|mathrm|sum|int|frac|prod|sqrt|infty|alpha|beta|gamma|delta|epsilon|lambda|mu|pi|sigma|omega|partial|nabla|left|right|langle|rangle|lvert|rvert|overline|underline|hat|bar|tilde|vec|dot|ddot|text|limits|displaystyle|scriptstyle)\s*\{[^}]*\}|\\(?:sum|int|infty|ldots|cdots|dots|forall|exists|equiv|approx|neq|leq|geq|subset|supset|subseteq|supseteq|in|notin))+)',
-            re.MULTILINE
+            r"((?:\\(?:mathsf|mathbf|mathrm|sum|int|frac|prod|sqrt|infty|alpha|beta|gamma|delta|epsilon|lambda|mu|pi|sigma|omega|partial|nabla|left|right|langle|rangle|lvert|rvert|overline|underline|hat|bar|tilde|vec|dot|ddot|text|limits|displaystyle|scriptstyle)\s*\{[^}]*\}|\\(?:sum|int|infty|ldots|cdots|dots|forall|exists|equiv|approx|neq|leq|geq|subset|supset|subseteq|supseteq|in|notin))+)",
+            re.MULTILINE,
         )
         text = latex_formula_pattern.sub(
             lambda m: self._inline_latex_formula_replacer(m, collector),
@@ -223,7 +222,7 @@ class MarkdownGenerator:
 
         # Handle inline image references like ![alt](attachment:<id>)
         text = re.sub(
-            r'!\[([^\]]*)\]\(attachment:([^)]+)\)',
+            r"!\[([^\]]*)\]\(attachment:([^)]+)\)",
             lambda m: self._inline_image_replacer(m, images_dir, collector),
             text,
         )
@@ -245,7 +244,7 @@ class MarkdownGenerator:
         res_id = collector.add_code(content, PositionType.INLINE)
         return inline_placeholder(ResourceType.CODE, res_id, content)
 
-    def _inline_image_replacer(self, match: re.Match, images_dir: Optional[Path], collector: ResourceCollector) -> str:
+    def _inline_image_replacer(self, match: re.Match, images_dir: Path | None, collector: ResourceCollector) -> str:
         alt = match.group(1)
         attachment_id = match.group(2)
         # Find the attachment in intermediate result
@@ -256,23 +255,21 @@ class MarkdownGenerator:
         return match.group(0)
 
     def _handle_block_image(
-        self, content: str, images_dir: Optional[Path], collector: ResourceCollector, use_placeholders: bool = True
+        self, content: str, images_dir: Path | None, collector: ResourceCollector, use_placeholders: bool = True
     ) -> list[str]:
         """Handle a block-level image."""
         # Parse markdown image syntax: ![caption](attachment:<id>) or ![caption](path)
-        m = re.match(r'!\[([^\]]*)\]\(([^)]+)\)', content)
+        m = re.match(r"!\[([^\]]*)\]\(([^)]+)\)", content)
         if m:
             alt = m.group(1)
             ref = m.group(2)
             # Check if it's an attachment reference
             if ref.startswith("attachment:"):
-                att_id = ref[len("attachment:"):]
+                att_id = ref[len("attachment:") :]
                 for att in self._intermediate.attachments:
                     if att.id == att_id:
                         if use_placeholders:
-                            res_id = collector.add_image(
-                                att.path, content=alt, position_type=PositionType.BLOCK
-                            )
+                            res_id = collector.add_image(att.path, content=alt, position_type=PositionType.BLOCK)
                             return [block_placeholder(ResourceType.IMAGE, res_id)]
                         return [self._format_image_reference(att, images_dir, alt, collector)]
             elif images_dir:
@@ -285,22 +282,18 @@ class MarkdownGenerator:
                     images_dir.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(src_path, dest_path)
                     rel_path = f"resources/images/{dest_name}"
-                    res_id = collector.add_image(
-                        rel_path, content=alt, position_type=PositionType.BLOCK
-                    )
+                    res_id = collector.add_image(rel_path, content=alt, position_type=PositionType.BLOCK)
                     if use_placeholders:
                         return [block_placeholder(ResourceType.IMAGE, res_id)]
                     return [f"![{alt}]({rel_path})"]
         # Fallback: record as image
-        res_id = collector.add_image(
-            content, content=content, position_type=PositionType.BLOCK
-        )
+        res_id = collector.add_image(content, content=content, position_type=PositionType.BLOCK)
         if use_placeholders:
             return [block_placeholder(ResourceType.IMAGE, res_id)]
         return [content]
 
     def _format_image_reference(
-        self, att: Attachment, images_dir: Optional[Path], alt: str = "", collector: Optional[ResourceCollector] = None
+        self, att: Attachment, images_dir: Path | None, alt: str = "", collector: ResourceCollector | None = None
     ) -> str:
         """Copy an image to the resources directory and return a Markdown image reference."""
         if collector is None:
@@ -312,16 +305,12 @@ class MarkdownGenerator:
         # Strip zip:// or other protocol prefixes
         if src_path.parts[0].startswith("zip:"):
             # Can't copy from virtual paths; keep reference
-            res_id = collector.add_image(
-                att.path, content=alt, position_type=PositionType.BLOCK
-            )
+            res_id = collector.add_image(att.path, content=alt, position_type=PositionType.BLOCK)
             return f"![{alt}](resources/images/image_{self._image_counter})"
 
         if not src_path.exists():
             # Source doesn't exist on filesystem; record reference
-            res_id = collector.add_image(
-                att.path, content=alt, position_type=PositionType.BLOCK
-            )
+            res_id = collector.add_image(att.path, content=alt, position_type=PositionType.BLOCK)
             return f"![{alt}](resources/images/{att.id})"
 
         # Determine file extension
@@ -334,9 +323,7 @@ class MarkdownGenerator:
             shutil.copy2(src_path, dest_path)
 
         rel_path = f"resources/images/{dest_name}"
-        collector.add_image(
-            rel_path, content=alt, position_type=PositionType.BLOCK
-        )
+        collector.add_image(rel_path, content=alt, position_type=PositionType.BLOCK)
         return f"![{alt}]({rel_path})"
 
     def _format_table(self, content: str) -> list[str]:
@@ -362,7 +349,12 @@ class MarkdownGenerator:
         return [content]
 
     def _format_list_item(
-        self, content: str, style_hint: str, images_dir: Optional[Path], collector: ResourceCollector, use_placeholders: bool = True
+        self,
+        content: str,
+        style_hint: str,
+        images_dir: Path | None,
+        collector: ResourceCollector,
+        use_placeholders: bool = True,
     ) -> list[str]:
         """Format a list item with appropriate prefix."""
         processed = self._process_inline(content, images_dir, collector, use_placeholders)
@@ -377,12 +369,10 @@ class MarkdownGenerator:
 
     # --- Detection helpers ---
 
-    def _detect_heading(
-        self, content: str, style_hint: str
-    ) -> Optional[tuple[int, str]]:
+    def _detect_heading(self, content: str, style_hint: str) -> tuple[int, str] | None:
         """Detect if content is a heading and return (level, text)."""
         # Check markdown syntax: # Heading
-        m = re.match(r'^(#{1,6})\s+(.+)$', content)
+        m = re.match(r"^(#{1,6})\s+(.+)$", content)
         if m:
             return len(m.group(1)), m.group(2)
 
@@ -399,20 +389,20 @@ class MarkdownGenerator:
     def _is_block_formula(self, content: str) -> bool:
         """Check if content is a block-level formula."""
         # Block formulas starting with $$
-        if re.match(r'^\$\$', content):
+        if re.match(r"^\$\$", content):
             return True
         # Standalone $...$ formulas
-        if re.match(r'^\s*\$[^$]+\$\s*$', content):
+        if re.match(r"^\s*\$[^$]+\$\s*$", content):
             return True
         # MinerU LaTeX formulas: entire content is a LaTeX formula ending with "latex"
         # e.g., "P _ {M} (x) = \sum_ {i = 0} ^ {\infty} 2 ^ {- | S _ {i} (x) |} latex"
         # Must end with "latex" and not contain regular text
         stripped = content.strip()
-        if stripped.endswith(' latex') and re.search(r'\\', stripped):
+        if stripped.endswith(" latex") and re.search(r"\\", stripped):
             # Check it's not a list item or regular paragraph
-            if not stripped.startswith('- ') and not stripped.startswith('1. '):
+            if not stripped.startswith("- ") and not stripped.startswith("1. "):
                 # Ensure it's primarily mathematical content (has multiple LaTeX commands)
-                latex_cmds = len(re.findall(r'\\[a-zA-Z]+', stripped))
+                latex_cmds = len(re.findall(r"\\[a-zA-Z]+", stripped))
                 if latex_cmds >= 2:
                     return True
         return False
@@ -423,7 +413,7 @@ class MarkdownGenerator:
 
     def _is_block_image(self, content: str) -> bool:
         """Check if content is a block-level image."""
-        return bool(re.match(r'^!\[', content))
+        return bool(re.match(r"^!\[", content))
 
     def _is_table(self, content: str) -> bool:
         """Check if content represents a table."""

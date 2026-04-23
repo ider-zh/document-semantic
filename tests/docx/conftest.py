@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
-from document_semantic.testing.routing import TestFlow, load_routes, resolve_route
+from document_semantic.utils.testing.routing import TestFlow, load_routes, resolve_route
 
 DOCX_DIR = Path(__file__).parent
 ROUTES_FILE = DOCX_DIR / "test_routes.yaml"
@@ -33,7 +33,7 @@ def expected_output_loader():
     def _load(yaml_path: Path) -> dict[str, Any]:
         if not yaml_path.exists():
             return {}
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path, encoding="utf-8") as f:
             return yaml.safe_load(f) or {}
 
     return _load

@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
+from document_semantic.agents.regex_recognizer import RegexRecognizer
+from document_semantic.agents.router_and_llm import (
+    LLMRecognizer,
+    RouterRecognizer,
+    RoutingRule,
+)
+from document_semantic.core.exceptions import RecognizerNotConfiguredError
 from document_semantic.models.blocks import (
     HeadingBlock,
     TextBlock,
@@ -14,18 +19,9 @@ from document_semantic.models.blocks import (
 from document_semantic.models.inline_elements import (
     BoldInlineElement,
     CodeSpanInlineElement,
-    ItalicInlineElement,
 )
 from document_semantic.models.semantic_document import SemanticDocument
-from document_semantic.parsers.protocol import IntermediateBlock, IntermediateResult
-from document_semantic.recognizers.protocol import RecognizerNotConfiguredError
-from document_semantic.recognizers.regex_recognizer import RegexRecognizer
-from document_semantic.recognizers.router_and_llm import (
-    LLMRecognizer,
-    RouterRecognizer,
-    RoutingRule,
-)
-
+from document_semantic.services.parsers.protocol import IntermediateBlock, IntermediateResult
 
 # ---------------------------------------------------------------------------
 # RegexRecognizer tests
@@ -132,10 +128,7 @@ class TestRegexRecognizer:
 
     def test_preserves_block_order(self, regex_recognizer: RegexRecognizer):
         """Recognizer preserves original block order."""
-        blocks = [
-            IntermediateBlock(content=f"Block {i}", style_hint="Normal")
-            for i in range(10)
-        ]
+        blocks = [IntermediateBlock(content=f"Block {i}", style_hint="Normal") for i in range(10)]
         intermediate = IntermediateResult(blocks=blocks, metadata={}, attachments=[])
 
         result = regex_recognizer.recognize(intermediate)
@@ -201,9 +194,7 @@ class TestLLMRecognizer:
     def test_raises_without_client(self):
         """LLMRecognizer raises RecognizerNotConfiguredError without client."""
         recognizer = LLMRecognizer(client=None)
-        intermediate = IntermediateResult(
-            blocks=[], metadata={}, attachments=[]
-        )
+        intermediate = IntermediateResult(blocks=[], metadata={}, attachments=[])
 
         with pytest.raises(RecognizerNotConfiguredError):
             recognizer.recognize(intermediate)

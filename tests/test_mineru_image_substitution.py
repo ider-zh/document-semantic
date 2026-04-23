@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from document_semantic.parsers.mineru_parser import (
-    _generate_placeholder_image,
+from document_semantic.services.parsers.mineru_parser import (
     _extract_images_from_docx,
+    _generate_placeholder_image,
+    _is_image_path,
     _replace_images_in_docx,
     _restore_images_in_zip,
-    _is_image_path,
 )
 
 
@@ -31,8 +31,9 @@ class TestGeneratePlaceholderImage:
     def test_placeholder_dimensions(self):
         """Generated placeholder should be 800x600 pixels."""
         try:
-            from PIL import Image
             import io
+
+            from PIL import Image
 
             data = _generate_placeholder_image()
             img = Image.open(io.BytesIO(data))
@@ -78,9 +79,7 @@ class TestReplaceImagesInDocx:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             output_path = Path(tmpdir) / "modified.docx"
-            replace_count = _replace_images_in_docx(
-                sample_docx_with_images, placeholder_data, output_path
-            )
+            replace_count = _replace_images_in_docx(sample_docx_with_images, placeholder_data, output_path)
 
             # Should have replaced at least one image
             assert replace_count > 0
@@ -211,10 +210,22 @@ def sample_docx_with_images():
         # Create a minimal DOCX with images
         with zipfile.ZipFile(docx_path, "w") as zf:
             # Minimal DOCX structure
-            zf.writestr("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n<Default Extension="png" ContentType="image/png"/>\n<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n<Default Extension="xml" ContentType="application/xml"/>\n</Types>')
-            zf.writestr("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n</Relationships>')
-            zf.writestr("word/_rels/document.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>\n</Relationships>')
-            zf.writestr("word/document.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n<w:body>\n<w:p><w:r><w:t>Test document with images</w:t></w:r></w:p>\n</w:body>\n</w:document>')
+            zf.writestr(
+                "[Content_Types].xml",
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n<Default Extension="png" ContentType="image/png"/>\n<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n<Default Extension="xml" ContentType="application/xml"/>\n</Types>',
+            )
+            zf.writestr(
+                "_rels/.rels",
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>\n</Relationships>',
+            )
+            zf.writestr(
+                "word/_rels/document.xml.rels",
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>\n</Relationships>',
+            )
+            zf.writestr(
+                "word/document.xml",
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">\n<w:body>\n<w:p><w:r><w:t>Test document with images</w:t></w:r></w:p>\n</w:body>\n</w:document>',
+            )
 
             # Add a minimal PNG image
             minimal_png = _generate_placeholder_image()

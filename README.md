@@ -48,7 +48,8 @@ uv sync --all-extras
 
 ```python
 from pathlib import Path
-from document_semantic.pipeline import Pipeline, PipelineConfig
+from document_semantic.pipelines.pipeline import Pipeline
+from document_semantic.core.config import PipelineConfig
 
 # Use defaults (python-docx parser + regex recognizer)
 config = PipelineConfig.load()
@@ -68,9 +69,9 @@ print(pipeline.get_trace().summary())
 
 ```python
 from pathlib import Path
-from document_semantic.pipeline import Pipeline, PipelineConfig
-from document_semantic.models.processor_output import ProcessorConfig
-from document_semantic.parsers.registry import ParserRegistry
+from document_semantic.pipelines.pipeline import Pipeline
+from document_semantic.core.config import PipelineConfig
+from document_semantic.services.parsers.registry import ParserRegistry
 
 # Create pipeline with python-docx parser (recognizer optional)
 config = PipelineConfig(parser="python-docx")
@@ -97,7 +98,7 @@ print(f"JSON mapping: {result.resources_json_path}")
 Or use the parser's `process()` method directly:
 
 ```python
-from document_semantic.parsers.registry import ParserRegistry
+from document_semantic.services.parsers.registry import ParserRegistry
 from document_semantic.models.processor_output import ProcessorConfig
 
 parser = ParserRegistry.get("python-docx")
@@ -236,7 +237,7 @@ This allows you to inspect what MinerU processed vs. the final restored output.
 1. Create a class that implements the `Parser` ABC:
 
 ```python
-from document_semantic.parsers.protocol import Parser, IntermediateResult
+from document_semantic.services.parsers.protocol import Parser, IntermediateResult
 from document_semantic.models.processor_output import ProcessorConfig, ProcessResult
 
 class MyCustomParser(Parser):
@@ -257,7 +258,7 @@ class MyCustomParser(Parser):
 2. Register it:
 
 ```python
-from document_semantic.parsers.registry import ParserRegistry
+from document_semantic.services.parsers.registry import ParserRegistry
 ParserRegistry.register("my-custom", MyCustomParser)
 ```
 
@@ -268,7 +269,7 @@ ParserRegistry.register("my-custom", MyCustomParser)
 1. Create a class that implements the `SemanticRecognizer` ABC:
 
 ```python
-from document_semantic.recognizers.protocol import SemanticRecognizer
+from document_semantic.agents.protocol import SemanticRecognizer
 from document_semantic.models.semantic_document import SemanticDocument
 
 class MyCustomRecognizer(SemanticRecognizer):
@@ -284,7 +285,7 @@ class MyCustomRecognizer(SemanticRecognizer):
 2. Register it:
 
 ```python
-from document_semantic.recognizers.router_and_llm import register_recognizer
+from document_semantic.agents.router_and_llm import register_recognizer
 register_recognizer("my-custom", MyCustomRecognizer)
 ```
 

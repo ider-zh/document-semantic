@@ -6,15 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from document_semantic.parsers.protocol import (
-    IntermediateResult,
+from document_semantic.core.exceptions import (
     ParserDependencyError,
     ParserNotFoundError,
 )
-from document_semantic.parsers.python_docx_parser import PythonDocxParser
-from document_semantic.parsers.pandoc_parser import PandocParser
-from document_semantic.parsers.registry import ParserRegistry
-
+from document_semantic.services.parsers.pandoc_parser import PandocParser
+from document_semantic.services.parsers.protocol import IntermediateResult
+from document_semantic.services.parsers.python_docx_parser import PythonDocxParser
+from document_semantic.services.parsers.registry import ParserRegistry
 
 # ---------------------------------------------------------------------------
 # PythonDocxParser tests
@@ -91,7 +90,7 @@ class TestPandocParser:
 
     def test_pandoc_not_available_raises(self, monkeypatch):
         """PandocParser raises ParserDependencyError when pandoc missing."""
-        monkeypatch.setattr("document_semantic.parsers.pandoc_parser._pandoc_available", lambda: False)
+        monkeypatch.setattr("document_semantic.services.parsers.pandoc_parser._pandoc_available", lambda: False)
         parser = PandocParser()
 
         with pytest.raises(ParserDependencyError) as exc_info:

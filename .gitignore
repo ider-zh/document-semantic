@@ -2,3 +2,5 @@ __pycache__/
 .venv
 .pytest_cache
 tests/docx/output/
+.ruff_cache/
+.mineru_cache

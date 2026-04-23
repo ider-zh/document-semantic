@@ -12,25 +12,23 @@ from typing import Any
 
 import pytest
 
+from document_semantic.agents.router_and_llm import create_recognizer
+from document_semantic.core.config import Settings
 from document_semantic.models.processor_output import ProcessorConfig
 from document_semantic.models.semantic_document import SemanticDocument
-from document_semantic.parsers.protocol import (
+from document_semantic.pipelines.pipeline import Pipeline
+from document_semantic.services.parsers.protocol import (
     IntermediateResult,
-    ParserDependencyError,
 )
-from document_semantic.pipeline import Pipeline, PipelineConfig
-from document_semantic.pipeline.pipeline import PipelineTrace
-from document_semantic.recognizers.protocol import SemanticRecognizer
-from document_semantic.recognizers.router_and_llm import create_recognizer
-from document_semantic.testing.assertions import (
+from document_semantic.utils.testing.assertions import (
     assert_document_partial,
     load_expected_output,
 )
-from document_semantic.testing.routing import (
+from document_semantic.utils.testing.routing import (
     ProcessorConfig as RouteProcessorConfig,
-    TestFlow,
+)
+from document_semantic.utils.testing.routing import (
     load_routes,
-    resolve_route,
     validate_route,
 )
 
@@ -69,10 +67,7 @@ def _collect_test_params():
 
         docx_files = []
         if "*" in route_key or "?" in route_key:
-            docx_files = [
-                p for p in DOCX_DIR.glob("*.docx")
-                if fnmatch.fnmatch(p.name, route_key)
-            ]
+            docx_files = [p for p in DOCX_DIR.glob("*.docx") if fnmatch.fnmatch(p.name, route_key)]
         else:
             docx_path = DOCX_DIR / route_key
             if docx_path.exists():
@@ -91,20 +86,22 @@ def _collect_test_params():
                     else:
                         expected_path = None
 
-                params.append((
-                    flow,
-                    proc,
-                    expected_path,
-                    has_assertions,
-                    docx_path,
-                ))
+                params.append(
+                    (
+                        flow,
+                        proc,
+                        expected_path,
+                        has_assertions,
+                        docx_path,
+                    )
+                )
 
     return params
 
 
 def _build_pipeline(proc: ProcessorConfig) -> Pipeline:
     """Build a Pipeline from a processor config."""
-    config = PipelineConfig(
+    config = Settings(
         parser=proc.parser,
         recognizer=proc.recognizer,
         verbosity="summary",
@@ -118,23 +115,19 @@ def _run_semantic_tools(
     tools: list,
 ) -> list[SemanticDocument]:
     """Run semantic tools from the processor config and collect results."""
-    from document_semantic.testing.routing import SemanticToolConfig
+    from document_semantic.utils.testing.routing import SemanticToolConfig
 
     results = []
     for tool_config in tools:
         if isinstance(tool_config, SemanticToolConfig):
             if tool_config.tool_type == "recognizer":
-                recognizer = create_recognizer(
-                    tool_config.recognizer_name, tool_config.params
-                )
+                recognizer = create_recognizer(tool_config.recognizer_name, tool_config.params)
                 result = recognizer.recognize(intermediate)
                 results.append(result)
     return results
 
 
-def _run_processor(
-    docx_path: Path, proc: RouteProcessorConfig
-) -> dict[str, Any]:
+def _run_processor(docx_path: Path, proc: RouteProcessorConfig) -> dict[str, Any]:
     """Run a single processor configuration against a DOCX file.
 
     Produces three output files: Markdown, resource directory, and JSON mapping.
@@ -152,7 +145,7 @@ def _run_processor(
         trace = pipeline.get_trace()
 
         # Run semantic tools on the intermediate result
-        from document_semantic.parsers.registry import ParserRegistry
+        from document_semantic.services.parsers.registry import ParserRegistry
 
         parser = ParserRegistry.get(proc.parser)
         intermediate = parser.parse(docx_path, skip_image_ocr=proc.skip_image_ocr)
@@ -170,9 +163,7 @@ def _run_processor(
             use_xml_placeholders=True,
         )
 
-        result = parser.process(
-            docx_path, output_dir, processor_config, skip_image_ocr=proc.skip_image_ocr
-        )
+        result = parser.process(docx_path, output_dir, processor_config, skip_image_ocr=proc.skip_image_ocr)
 
         # Track output files
         if result.rich_markdown_path:
@@ -221,6 +212,7 @@ def _pandoc_available() -> bool:
 def _mineru_token_available() -> bool:
     """Check if MinerU API token is configured."""
     import os
+
     return bool(os.getenv("MINERU_TOKEN") or os.getenv("token_mineru"))
 
 
@@ -256,8 +248,7 @@ def test_docx_flow(flow, proc, expected_path, has_assertions, docx_path):
             pytest.skip(f"Dependency not available: {'; '.join(result['errors'])}")
         error_msg = (
             f"Processor failed for {docx_path.name} with "
-            f"parser={proc.parser}, recognizer={proc.recognizer}:\n"
-            + "\n".join(result["errors"])
+            f"parser={proc.parser}, recognizer={proc.recognizer}:\n" + "\n".join(result["errors"])
         )
         pytest.fail(error_msg)
 
@@ -294,4 +285,4 @@ def test_routes_validation():
         errors = validate_route(flow)
         if errors:
             all_errors.extend([f"[{key}] {e}" for e in errors])
-    assert not all_errors, f"Route validation errors:\n" + "\n".join(all_errors)
+    assert not all_errors, "Route validation errors:\n" + "\n".join(all_errors)

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class ResourceType(str, Enum):
@@ -55,24 +54,20 @@ def block_placeholder(resource_type: ResourceType, resource_id: int) -> str:
         <code id="1"/>
         <image id="1"/>
     """
-    return f"<{resource_type.value} id=\"{resource_id}\"/>"
+    return f'<{resource_type.value} id="{resource_id}"/>'
 
 
-def inline_placeholder(
-    resource_type: ResourceType, resource_id: int, content: str
-) -> str:
+def inline_placeholder(resource_type: ResourceType, resource_id: int, content: str) -> str:
     """Generate an inline XML placeholder with preserved original content.
 
     Examples:
         <formula id="1">E = mc^2</formula>
         <code id="1">print("hello")</code>
     """
-    return f"<{resource_type.value} id=\"{resource_id}\">{content}</{resource_type.value}>"
+    return f'<{resource_type.value} id="{resource_id}">{content}</{resource_type.value}>'
 
 
-def format_block_placeholder(
-    resource_type: ResourceType, resource_id: int, newline: bool = True
-) -> str:
+def format_block_placeholder(resource_type: ResourceType, resource_id: int, newline: bool = True) -> str:
     """Format a block placeholder, optionally with surrounding newlines.
 
     When newline=True, the placeholder occupies its own line with blank lines
