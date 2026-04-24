@@ -1,4 +1,6 @@
+import json
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich import print as rprint
@@ -88,8 +90,11 @@ def process_pipeline(
     no_markdown: bool = typer.Option(False, "--no-markdown", help="Do not generate markdown file"),
     no_resources: bool = typer.Option(False, "--no-resources", help="Do not generate resources directory"),
     no_json: bool = typer.Option(False, "--no-json", help="Do not generate JSON mapping file"),
+    refine: bool = typer.Option(False, "--refine", help="Refine content using Agent"),
+    translate: Optional[str] = typer.Option(None, "--translate", help="Target language for translation (e.g., 'English')"),
+    template: Optional[str] = typer.Option(None, "--template", help="Template ID for rendering (e.g., 'jcst-v2')"),
 ):
-    """Run the processor output workflow (Markdown + Resources + JSON)."""
+    """Run the processor output workflow with optional Agent-based enhancements."""
     try:
         # Load config for parser selection
         base_config = Settings.load(config)
@@ -109,33 +114,106 @@ def process_pipeline(
                 f"Processing [bold cyan]{docx_path}[/bold cyan]\n"
                 f"Parser: [green]{parser_name}[/green]\n"
                 f"Output: [yellow]{output_dir}[/yellow]",
-                title="Processor Workflow",
+                title="Document Semantic Workflow",
             )
         )
 
+        # 1. Base Parsing
         result = proc_parser.process(docx_path, output_dir, config=processor_config, skip_image_ocr=skip_image_ocr)
+        
+        # We need content_list for further processing
+        if not result.content_list_json_path:
+            rprint("[yellow]Warning:[/yellow] No content_list.json produced. Skipping Agent steps.")
+            _print_result_table(result)
+            return
 
-        # Print results
-        table = Table(title="Generated Artifacts")
-        table.add_column("Type", style="cyan")
-        table.add_column("Path", style="green")
+        with open(result.content_list_json_path, "r", encoding="utf-8") as f:
+            from document_semantic.models.mineru_content import MinerUContentList
+            content = MinerUContentList.model_validate(json.load(f))
 
-        if result.rich_markdown_path:
-            table.add_row("Markdown (Rich)", str(result.rich_markdown_path))
-        if result.placeholder_markdown_path:
-            table.add_row("Markdown (XML)", str(result.placeholder_markdown_path))
-        if result.resources_dir:
-            table.add_row("Resources", str(result.resources_dir))
-        if result.resources_json_path:
-            table.add_row("JSON Mapping", str(result.resources_json_path))
-        if result.content_list_json_path:
-            table.add_row("Content JSON", str(result.content_list_json_path))
+        # 2. Refinement
+        if refine:
+            rprint("[bold blue]Starting Content Refinement Agent...[/bold blue]")
+            from document_semantic.agents.refinement_agent import LLMRefinementAgent
+            from document_semantic.workflows.content_refinement import ContentRefinementWorkflow
+            
+            refine_agent = LLMRefinementAgent()
+            refine_workflow = ContentRefinementWorkflow(refine_agent)
+            content = refine_workflow.process_document(content)
+            
+            # Update file
+            with open(result.content_list_json_path, "w", encoding="utf-8") as f:
+                f.write(content.model_dump_json(indent=2))
 
-        console.print(table)
+        # 3. Translation
+        if translate:
+            rprint(f"[bold blue]Starting Translation Agent (to {translate})...[/bold blue]")
+            from document_semantic.agents.judger import LLMJudgerAgent
+            from document_semantic.agents.translator import LLMTranslationAgent
+            from document_semantic.workflows.translation import TranslationWorkflow
+            
+            trans_agent = LLMTranslationAgent()
+            judger_agent = LLMJudgerAgent()
+            trans_workflow = TranslationWorkflow(translators=[trans_agent], judger=judger_agent)
+            
+            content = trans_workflow.translate_document(content, tgt_lang=translate)
+            
+            # Update file
+            with open(result.content_list_json_path, "w", encoding="utf-8") as f:
+                f.write(content.model_dump_json(indent=2))
+
+        # 4. Rendering with Template
+        if template:
+            rprint(f"[bold blue]Applying Semantic Template: {template}...[/bold blue]")
+            from document_semantic.agents.semantic_annotator import SemanticAnnotatorAgent
+            from document_semantic.renderers.advanced_docx_renderer import AdvancedDocxRenderer
+            from document_semantic.templates.registry import TemplateRegistry
+            
+            tpl = TemplateRegistry.get(template)
+            if not tpl:
+                rprint(f"[red]Error:[/red] Template '{template}' not found.")
+            else:
+                annotator = SemanticAnnotatorAgent()
+                annotated_content = annotator.annotate(content.root, tpl)
+                
+                renderer = AdvancedDocxRenderer(resources_dir=result.resources_dir)
+                final_docx = output_dir / f"output_{template}.docx"
+                renderer.render(annotated_content, tpl, final_docx)
+                
+                # Add to result (hacky but works for display)
+                result.metadata["final_docx"] = final_docx
+
+        _print_result_table(result)
 
     except Exception as e:
         rprint(f"[bold red]Error:[/bold red] {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise typer.Exit(code=1)
+
+
+def _print_result_table(result):
+    # Print results
+    table = Table(title="Generated Artifacts")
+    table.add_column("Type", style="cyan")
+    table.add_column("Path", style="green")
+
+    if result.rich_markdown_path:
+        table.add_row("Markdown (Rich)", str(result.rich_markdown_path))
+    if result.placeholder_markdown_path:
+        table.add_row("Markdown (XML)", str(result.placeholder_markdown_path))
+    if result.resources_dir:
+        table.add_row("Resources", str(result.resources_dir))
+    if result.resources_json_path:
+        table.add_row("JSON Mapping", str(result.resources_json_path))
+    if result.content_list_json_path:
+        table.add_row("Content JSON", str(result.content_list_json_path))
+    
+    final_docx = result.metadata.get("final_docx")
+    if final_docx:
+        table.add_row("Final Document", str(final_docx))
+
+    console.print(table)
 
 
 @app.command(name="config")

@@ -99,8 +99,36 @@ intermediate_result.json 作为前一版本的输出结果, 相比 content_list_
 
 
 # 7
-content_list_v2.json 的结构是什么? 需要定义一个数据class表示, 后续不同的业务开发需要扩展内容
+content_list.json 的结构是什么? 需要定义一个数据class表示, 后续不同的业务开发需要扩展内容
 
+# 8
 以下是计划开发的模块:
-1. 语言映射模块, 提供  
-将 title, abstract, conclusion, reference 等从 content_list_v2 中的 head1 中提取出来
++ chunk 模块, 使用 agent 处理避免上下文过长, 需要根据段落的结构, 进行分块处理, 还需提供恢复的功能, 优先不chunk, 然后把是 head1 , head2, 段落 这样的持续, 只有超过chunk size 是才会降级.
++ 格式保护模块, 为了让 agent 能够利用上下文处理需要的任务, 需要对一些内容进行保护, 处理后可恢复, 比如公式, 表格, 代码, 图片占位等, 比如翻译模块, 需要公式, 表格, 代码等, 保护不翻译, 对 head, list 等进行局部保护, 翻译后恢复样式, 不对连续段落保护, agent 自主控制翻译后的段落情况等. 翻译后要进行验证, 确保保护规则完整, 否则要下游模块重试 
++ 翻译模块, 对 chunks 后的经过保护模块的内容翻译, 翻译后无法通过上游模块的, 需要重试. 翻译模块比较复杂, 使用翻译 agent 处理, 先需要全局处理关键词表,对齐翻译, chunk 翻译时, 要根据 chunk 内容, 部分召回关键词. 同一个chunk会经过不同agent的多次翻译, 翻译后先让上游模块验证合格, 再等待 llms as judger 模块合并评分处理, 只有达到标准的领先者才会输出, 否则要循环这个流程. 这个模块用户可以自定义翻译的 prompt, judger 的 prompt
++ 内容处理模块(引文排序, 正文引文表述重写等杂项), 这个内容也是用 agent 处理, 需要 chunk 和 按需保护, 不需要 judger.
+
+---
+以上的处理模块完成后都能恢复成 MinerUImageContent 的带meta的扩展类型数据
+---
+
++ 标准语义化模版引擎, 这是一个接口标准, JCST, IEEE 样式模版提供样式和样式的语义. agent 只会用模版中有的语义,将数据中的段落标记上语义, 转换成这个接口的数据, 下游的模版引擎就能将数据格式化成对应的样式, 无法标记语义的使用基础的head, text 模版
++ docx 模版输出. 内置 jcst, IEEE 等的样式标准, 提供 llm.txt, 方便 agent 设计模版
++ latex 模版输出 内置 jcst, IEEE 等的样式标准, 提供 llm.txt, 方便 agent 设计模版
+
+这些模块有的还在设计当中, 需要先开发一个链路的模块进行测试
+当前先开发 chunk 模块, 格式保护模块和翻译模块, 有需要可以先扩展项目架构, 再进行这一个链路的开发
+
+# 9
+参考 recognizer_model_id pandoc_recognizer.py stands 进行 agent开发, 使用 config 已有的 qwen3.5-9 进行开发测试
+进行下一步开发
+
+## 10
+todo:
+  接下来的工作：
+   - 完善 LaTeX 细节：增强对图片引用的自动转换。
+   - 内置标准模板库：您可以提供 JCST 或 IEEE 的官方 .docx 模板文件，我将其配置到 DocxRenderer 中，以实现真正的“一键换装”。
+   - 增加 llm.txt 支持：为您提到的 Agent 辅助设计模板功能提供文档支持。
+
+
+# 11

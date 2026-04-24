@@ -1,0 +1,58 @@
+# Semantic Template Design Guide (llm.txt)
+
+This document provides instructions for an Agent to design or modify `SemanticTemplate` configurations for high-fidelity document rendering.
+
+## Overview
+A `SemanticTemplate` defines how a document's semantic elements (e.g., titles, paragraphs, equations) are mapped to visual styles in output formats like DOCX or LaTeX.
+
+## Configuration Structure
+
+### 1. Page Setup (`page`)
+Controls the physical layout of the document.
+- `width`, `height`: Paper size (e.g., "210mm", "297mm").
+- `margins`: `top`, `bottom`, `left`, `right` (e.g., "26mm").
+- `columns`: 
+    - `title_page`: Number of columns for the title area.
+    - `abstract_page`: Number of columns for the abstract area.
+    - `body`: Number of columns for the main content (e.g., 2 for dual-column).
+    - `column_spacing`: Gap between columns (e.g., "8mm").
+
+### 2. Semantic Tags (`tags`)
+A list of allowed labels that the `SemanticAnnotatorAgent` can apply to document blocks.
+- `name`: Machine identifier (e.g., `paper_title`).
+- `description`: Instructions for the Agent on what content this tag represents.
+
+### 3. Docx Styles (`styles`)
+Maps a semantic tag name to a visual style definition.
+- `font`: Font name (e.g., "Times New Roman").
+- `size`: Font size in points (e.g., 10).
+- `bold`, `italic`: Boolean flags.
+- `align`: "left", "center", "right", or "justified".
+- `space_before`, `space_after`: Vertical spacing in points.
+- `line_spacing`: Line height multiplier (e.g., 1.15).
+- `indent_first`: First line indent in points (e.g., 21).
+- `text_transform`: "uppercase" or "lowercase".
+
+## Example: JCST Layout Snippet
+```yaml
+page:
+  columns:
+    title_page: 1
+    body: 2
+styles:
+  paper_title:
+    font: "Times New Roman"
+    size: 16
+    align: "center"
+    text_transform: "uppercase"
+  body_text:
+    font: "Times New Roman"
+    size: 10
+    indent_first: 21
+    align: "justified"
+```
+
+## Tips for Agents
+1. **Consistency**: Use standard names for common elements (`paper_title`, `section_head`, `body_text`).
+2. **Precision**: Use exact measurements (mm, pt) provided in journal guidelines.
+3. **Safety**: Always include a `body_text` tag as a fallback for standard paragraphs.

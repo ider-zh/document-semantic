@@ -31,3 +31,7 @@ suppress_warnings: []
 recognizer_model_id: 'qwen3.5-9b'
 # recognizer_model_id: 'minimax-m2.7'
 recognizer_model_provider_url: 'https://api.toop.ai/v1'
+
+recognizer_model_id: 'qwen3.5-9b'
+# recognizer_model_id: 'minimax-m2.7'
+recognizer_model_provider_url: 'https://api.toop.ai/v1'

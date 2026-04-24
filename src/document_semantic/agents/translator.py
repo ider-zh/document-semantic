@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+from strands import Agent
+from strands.models.openai import OpenAIModel
+
+from document_semantic.core.config import settings
+from document_semantic.core.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class TranslationResult(BaseModel):
+    """Structured output for translation."""
+
+    translated_text: str = Field(description="The translated text with placeholders preserved.")
+
+
+class LLMTranslationAgent:
+    """Translation agent using Strands and LLM."""
+
+    def __init__(self, model_id: str | None = None, prompt_template: str | None = None):
+        self.model_id = model_id or settings.recognizer_model_id
+        self.agent = Agent(
+            model=OpenAIModel(
+                client_args={
+                    "api_key": settings.recognizer_model_api_key,
+                    "base_url": settings.recognizer_model_provider_url,
+                    "timeout": settings.recognizer_modelizer_model_timeout,
+                },
+                model_id=self.model_id,
+            )
+        )
+        self.prompt_template = prompt_template or (
+            "You are a professional academic translator. Translate the following text from {src_lang} to {tgt_lang}.\n"
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. PRESERVE all placeholders like <P:EQ_1/>, <P:IMG_2/>, etc. EXACTLY as they are. Do not translate or modify them.\n"
+            "2. Maintain the original Markdown structure (headings, lists).\n"
+            "3. Use the provided glossary for consistent terminology.\n"
+            "4. If the text is already in the target language, return it as is but ensure placeholders are correct.\n\n"
+            "Glossary:\n{glossary}\n\n"
+            "Text to translate:\n{text}"
+        )
+
+    def translate(self, text: str, context: dict[str, Any]) -> str:
+        """Translates text using the LLM."""
+        glossary_items = context.get("glossary", {})
+        glossary_str = "\n".join([f"- {k}: {v}" for k, v in glossary_items.items()])
+
+        prompt = self.prompt_template.format(
+            src_lang=context.get("src_lang", "Auto"),
+            tgt_lang=context.get("tgt_lang", "Chinese"),
+            glossary=glossary_str or "None",
+            text=text,
+        )
+
+        try:
+            logger.info(f"[agent:translator] Translating {len(text)} chars using {self.model_id}")
+            result = self.agent(prompt, structured_output_model=TranslationResult)
+            return result.structured_output.translated_text
+        except Exception as e:
+            logger.error(f"[agent:translator] Translation failed: {e}")
+            raise
