@@ -132,3 +132,25 @@ todo:
 
 
 # 11
+以下是需要 debug 的流程, 你先找出问题原因, 然后提供修复方案
+uv run document-semantic process tests/docx/test_2.docx tests/docx/output/cli_test -p mineru --refine --translate English --template jcst-v2
+
+# 12 
+以下是需要 debug 的流程, 你先找出问题原因, 然后提供修复方案
+uv run document-semantic process tests/docx/test_2.docx tests/docx/output/cli_test -p mineru --refine --translate English --template 
+输出文档 tests/docx/output/cli_test/output_jcst-v2.docx,
++ 图片缺失
++ 内容与 test_2.docx 不一致
+
++ 中英文混杂
++ 图片是md语法占位代码并没有引入图片.
+
+# 13
+对于一些技术点需要确认
+1. 翻译流程中, 全局术语表是否是按需召回?
+2. 对于段落级别的语义识别的内容, 是否可以优化段落长度, 比如通过保留开始结束,中间内容省略的方式, 实现段落语义的识别 "In the development of science, theory sometimes precedes practice, [[Omit 400 words]]. Solomonoff is thus rightfully hailed as a prophet of Large Language Models."
+段落语义的识别对与段落内部的内部不敏感, 对于上下段落比较敏感
+
+# 14
+chunk 之后的处理可以并行化, 比如  agent 处理每个 chunk, 翻译模块, 内容处理模块等, 都可以并行处理. 将并行量作为配置项, 放入 config.yml 中
+

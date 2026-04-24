@@ -1107,7 +1107,10 @@ class _MinerUContentConverter:
         except Exception as e:
             logger.error(f"[parsing:mineru] Failed to align docx text: {e}", exc_info=True)
 
-        # Generate both markdowns
+        # Pre-process resources: extract once and update paths
+        self._extract_all_resources(items, zf, images_dir)
+
+        # Generate both markdowns (now they will use updated paths and won't increment counters)
         rich_lines = self._generate_markdown(items, zf, images_dir, use_placeholders=False)
         placeholder_lines = self._generate_markdown(items, zf, images_dir, use_placeholders=True)
 
@@ -1131,6 +1134,58 @@ class _MinerUContentConverter:
             json_path = self._write_resources_json(output_dir)
 
         return rich_path, placeholder_path, resources_dir, json_path, content_list_path
+
+    def _extract_all_resources(self, items: list[dict], zf: zipfile.ZipFile, images_dir: Path | None):
+        """Extract all images/resources once and update their paths in the items."""
+        for item in items:
+            elem_type = item.get("type")
+            content = item.get("content", {})
+            if elem_type in ("image", "figure", "img"):
+                self._extract_single_image(content, zf, images_dir)
+            elif elem_type == "equation_interline":
+                # Interline equations often have an image_source
+                self._extract_single_image(content, zf, images_dir)
+            
+            # Check for inline content (paragraph_content, title_content)
+            # Some inline equations might also have image_source in some MinerU versions
+            for key in ("paragraph_content", "title_content"):
+                if key in content and isinstance(content[key], list):
+                    for sub in content[key]:
+                        if sub.get("type") == "equation_inline":
+                            self._extract_single_image(sub, zf, images_dir)
+
+    def _extract_single_image(self, content: dict, zf: zipfile.ZipFile, images_dir: Path | None):
+        img_source = content.get("image_source", {})
+        if isinstance(img_source, dict):
+            img_path = img_source.get("path", "")
+        elif isinstance(img_source, str):
+            img_path = img_source
+        else:
+            img_path = ""
+
+        if not img_path:
+            return
+
+        self._image_counter += 1
+        img_name = f"image_{self._image_counter}{Path(img_path).suffix or '.png'}"
+        resource_rel_path = f"images/{img_name}"
+        markdown_rel_path = f"resources/images/{img_name}"
+
+        # Update content in-place
+        if isinstance(content.get("image_source"), dict):
+            content["image_source"]["path"] = resource_rel_path
+        
+        # Store metadata for markdown generation
+        content["_extracted_path"] = markdown_rel_path
+        content["_image_id"] = self._image_counter
+
+        if images_dir:
+            images_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                img_data = zf.read(img_path)
+                (images_dir / img_name).write_bytes(img_data)
+            except KeyError:
+                pass
 
     def _generate_markdown(
         self,
@@ -1275,13 +1330,8 @@ class _MinerUContentConverter:
         use_placeholders: bool,
     ) -> list[str]:
         """Convert image element to Markdown."""
-        img_source = content.get("image_source", {})
-        if isinstance(img_source, dict):
-            img_path = img_source.get("path", "")
-        elif isinstance(img_source, str):
-            img_path = img_source
-        else:
-            img_path = ""
+        markdown_rel_path = content.get("_extracted_path", "")
+        img_id = content.get("_image_id", 0)
 
         caption_parts = []
         raw_caption = content.get("image_caption", [])
@@ -1301,38 +1351,24 @@ class _MinerUContentConverter:
 
         caption = " ".join(p for p in caption_parts if p).strip()
 
-        if not img_path:
+        if not markdown_rel_path:
             return []
 
-        # Extract image from ZIP to resources
-        self._image_counter += 1
-        img_name = f"image_{self._image_counter}{Path(img_path).suffix or '.png'}"
-        rel_path = f"resources/images/{img_name}"
-
-        if images_dir:
-            images_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                img_data = zf.read(img_path)
-                (images_dir / img_name).write_bytes(img_data)
-            except KeyError:
-                pass  # Image not in ZIP
-
         if use_placeholders:
-            self._resources["image"][str(self._image_counter)] = {
+            self._resources["image"][str(img_id)] = {
                 "type": "block",
                 "content": caption,
-                "file": rel_path,
+                "file": markdown_rel_path,
                 "metadata": {},
             }
             # Embed caption inside the image tag for semantic completeness
             if caption:
-                lines = [f'<image id="{self._image_counter}">{caption}</image>']
+                lines = [f'<image id="{img_id}">{caption}</image>']
             else:
-                lines = [f'<image id="{self._image_counter}"/>']
+                lines = [f'<image id="{img_id}"/>']
             return lines
 
-        return [f"![{caption}]({rel_path})"]
-
+        return [f"![{caption}]({markdown_rel_path})"]
     def _table_to_markdown(self, content: dict, use_placeholders: bool) -> list[str]:
         """Convert table element to Markdown."""
         # Extract table text as-is

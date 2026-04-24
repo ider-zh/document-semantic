@@ -30,21 +30,24 @@ class LLMGlossaryExtractor:
 
     def __init__(self, model_id: str | None = None, prompt_template: str | None = None):
         self.model_id = model_id or settings.recognizer_model_id
-        self.agent = Agent(
-            model=OpenAIModel(
-                client_args={
-                    "api_key": settings.recognizer_model_api_key,
-                    "base_url": settings.recognizer_model_provider_url,
-                    "timeout": settings.recognizer_modelizer_model_timeout,
-                },
-                model_id=self.model_id,
-            )
-        )
         self.prompt_template = prompt_template or (
             "You are a professional terminologist. Extract key technical terms, named entities, "
             "and domain-specific jargon from the following text and provide their standard translations "
             "from {src_lang} to {tgt_lang}.\n\n"
             "Text:\n{text}"
+        )
+
+    def _create_agent(self) -> Agent:
+        """Creates a fresh Agent instance for thread-safe invocation."""
+        return Agent(
+            model=OpenAIModel(
+                client_args={
+                    "api_key": settings.recognizer_model_api_key,
+                    "base_url": settings.provider_base_url,
+                    "timeout": settings.recognizer_modelizer_model_timeout,
+                },
+                model_id=self.model_id,
+            )
         )
 
     @observe(name="glossary_extractor")
@@ -54,8 +57,11 @@ class LLMGlossaryExtractor:
 
         try:
             logger.info(f"[agent:glossary] Extracting terminology from {len(text)} chars using {self.model_id}")
-            result = self.agent(prompt, structured_output_model=GlossaryExtraction)
+            agent = self._create_agent()
+            result = agent(prompt, structured_output_model=GlossaryExtraction)
             return {item.term: item.translation for item in result.structured_output.items}
         except Exception as e:
             logger.error(f"[agent:glossary] Glossary extraction failed: {e}")
+            return {}
+
             return {}

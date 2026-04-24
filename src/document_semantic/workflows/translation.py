@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from document_semantic.agents.glossary_extractor import LLMGlossaryExtractor
 from document_semantic.agents.judger import LLMJudgerAgent
 from document_semantic.agents.translator import LLMTranslationAgent
+from document_semantic.core.config import settings
 from document_semantic.models.mineru_content import (
     MinerUContentList,
     MinerUElement,
@@ -27,12 +29,14 @@ class TranslationWorkflow:
         glossary_extractor: LLMGlossaryExtractor | None = None,
         chunk_size: int = 4000,
         max_retries: int = 3,
+        parallel_chunks: int | None = None,
     ):
         self.translators = translators
         self.judger = judger
         self.glossary_extractor = glossary_extractor or LLMGlossaryExtractor()
         self.chunker = Chunker(max_chars=chunk_size)
         self.max_retries = max_retries
+        self.parallel_chunks = parallel_chunks or settings.parallel_chunks
 
     def translate_document(
         self, content: MinerUContentList, src_lang: str = "English", tgt_lang: str = "Chinese"
@@ -50,15 +54,21 @@ class TranslationWorkflow:
         chunks = self.chunker.chunk(elements)
         logger.info(f"[workflow:translation] Document split into {len(chunks)} chunks")
 
-        translated_elements = []
-        for i, chunk_elements in enumerate(chunks):
+        # 3. Parallel processing of chunks
+        def process_single_chunk(i_chunk):
+            i, chunk_elements = i_chunk
             logger.info(f"[workflow:translation] Processing chunk {i + 1}/{len(chunks)}")
-            # 3. Partial glossary recall for this chunk
             chunk_text = self._elements_to_text(chunk_elements)
             local_glossary = self._recall_glossary(chunk_text, global_glossary)
+            return self._process_chunk(chunk_elements, local_glossary, src_lang, tgt_lang)
 
-            translated_chunk = self._process_chunk(chunk_elements, local_glossary, src_lang, tgt_lang)
-            translated_elements.extend(translated_chunk)
+        with ThreadPoolExecutor(max_workers=self.parallel_chunks) as executor:
+            # Maintain order by indexing or using map on enumerated chunks
+            results = list(executor.map(process_single_chunk, enumerate(chunks)))
+
+        translated_elements = []
+        for chunk_result in results:
+            translated_elements.extend(chunk_result)
 
         return MinerUContentList(root=translated_elements)
 
@@ -100,10 +110,11 @@ class TranslationWorkflow:
         # Restore
         return protector.restore(best_text, mapping)
 
-    def _get_sample_text(self, elements: list[MinerUElement], max_chars: int = 5000) -> str:
+    def _get_sample_text(self, elements: list[MinerUElement], max_chars: int = 3000) -> str:
         """Gets a sample text for glossary extraction."""
         text = self._elements_to_text(elements)
         return text[:max_chars]
+
 
     def _elements_to_text(self, elements: list[MinerUElement]) -> str:
         """Simple extraction of all text from elements."""

@@ -25,24 +25,27 @@ class LLMRefinementAgent:
 
     def __init__(
         self,
-        model_id: Optional[str] = None,
-        task_description: str = "Reformat citations in text to be consistent (e.g., [1, 2, 3] instead of [1,3,2]) and improve academic flow."
+        model_id: str | None = None,
+        task_description: str = "Reformat citations in text to be consistent (e.g., [1, 2, 3] instead of [1,3,2]) and improve academic flow.",
     ):
         self.model_id = model_id or settings.recognizer_model_id
-        self.agent = Agent(
+        self.task_description = task_description
+
+    def _create_agent(self) -> Agent:
+        """Creates a fresh Agent instance for thread-safe invocation."""
+        return Agent(
             model=OpenAIModel(
                 client_args={
                     "api_key": settings.recognizer_model_api_key,
-                    "base_url": settings.recognizer_model_provider_url,
+                    "base_url": settings.provider_base_url,
                     "timeout": settings.recognizer_modelizer_model_timeout,
                 },
                 model_id=self.model_id,
             )
         )
-        self.task_description = task_description
 
     @observe(name="refinement_agent")
-    def refine(self, text: str, context: Dict[str, Any]) -> RefinementResult:
+    def refine(self, text: str, context: dict[str, Any]) -> RefinementResult:
         """Refines text based on the configured task."""
         prompt = (
             f"You are a professional academic editor. Task: {self.task_description}\n\n"
@@ -55,11 +58,11 @@ class LLMRefinementAgent:
 
         try:
             logger.info(f"[agent:refinement] Refining {len(text)} chars using {self.model_id}")
-            result = self.agent(
-                prompt,
-                structured_output_model=RefinementResult
-            )
+            agent = self._create_agent()
+            result = agent(prompt, structured_output_model=RefinementResult)
             return result.structured_output
         except Exception as e:
             logger.error(f"[agent:refinement] Refinement failed: {e}")
+            raise
+
             raise

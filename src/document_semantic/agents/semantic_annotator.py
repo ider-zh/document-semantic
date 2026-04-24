@@ -37,11 +37,12 @@ class SemanticAnnotatorAgent:
             model=OpenAIModel(
                 client_args={
                     "api_key": settings.recognizer_model_api_key,
-                    "base_url": settings.recognizer_model_provider_url,
+                    "base_url": settings.provider_base_url,
                     "timeout": settings.recognizer_modelizer_model_timeout,
                 },
                 model_id=self.model_id,
-            )
+            ),
+            callback_handler=None,
         )
 
     @observe(name="semantic_annotator_agent")

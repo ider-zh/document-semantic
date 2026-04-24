@@ -93,12 +93,15 @@ def process_pipeline(
     refine: bool = typer.Option(False, "--refine", help="Refine content using Agent"),
     translate: Optional[str] = typer.Option(None, "--translate", help="Target language for translation (e.g., 'English')"),
     template: Optional[str] = typer.Option(None, "--template", help="Template ID for rendering (e.g., 'jcst-v2')"),
+    chunk_size: int = typer.Option(2000, "--chunk-size", help="Maximum characters per chunk for Agent processing"),
+    parallel_chunks: Optional[int] = typer.Option(None, "--parallel-chunks", help="Number of chunks to process in parallel"),
 ):
     """Run the processor output workflow with optional Agent-based enhancements."""
     try:
         # Load config for parser selection
         base_config = Settings.load(config)
         parser_name = parser or base_config.parser
+        parallel_workers = parallel_chunks or base_config.parallel_chunks
 
         proc_parser = ParserRegistry.get(parser_name)
 
@@ -138,7 +141,7 @@ def process_pipeline(
             from document_semantic.workflows.content_refinement import ContentRefinementWorkflow
             
             refine_agent = LLMRefinementAgent()
-            refine_workflow = ContentRefinementWorkflow(refine_agent)
+            refine_workflow = ContentRefinementWorkflow(refine_agent, chunk_size=chunk_size, parallel_chunks=parallel_workers)
             content = refine_workflow.process_document(content)
             
             # Update file
@@ -154,7 +157,12 @@ def process_pipeline(
             
             trans_agent = LLMTranslationAgent()
             judger_agent = LLMJudgerAgent()
-            trans_workflow = TranslationWorkflow(translators=[trans_agent], judger=judger_agent)
+            trans_workflow = TranslationWorkflow(
+                translators=[trans_agent], 
+                judger=judger_agent, 
+                chunk_size=chunk_size,
+                parallel_chunks=parallel_workers
+            )
             
             content = trans_workflow.translate_document(content, tgt_lang=translate)
             
@@ -179,6 +187,11 @@ def process_pipeline(
                 renderer = AdvancedDocxRenderer(resources_dir=result.resources_dir)
                 final_docx = output_dir / f"output_{template}.docx"
                 renderer.render(annotated_content, tpl, final_docx)
+                
+                # Save annotated JSON for debugging
+                annotated_path = output_dir / f"annotated_content_list_{template}.json"
+                with open(annotated_path, "w", encoding="utf-8") as f:
+                    f.write(annotated_content.model_dump_json(indent=2))
                 
                 # Add to result (hacky but works for display)
                 result.metadata["final_docx"] = final_docx

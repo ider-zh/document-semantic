@@ -25,18 +25,6 @@ class LLMTranslationAgent:
 
     def __init__(self, model_id: str | None = None, prompt_template: str | None = None):
         self.model_id = model_id or settings.recognizer_model_id
-        # Note: strands might need a client with langfuse if we want deep integration,
-        # but for now we use the observe decorator for top-level tracking.
-        self.agent = Agent(
-            model=OpenAIModel(
-                client_args={
-                    "api_key": settings.recognizer_model_api_key,
-                    "base_url": settings.recognizer_model_provider_url,
-                    "timeout": settings.recognizer_modelizer_model_timeout,
-                },
-                model_id=self.model_id,
-            )
-        )
         self.prompt_template = prompt_template or (
             "You are a professional academic translator. Your goal is to translate the provided text into {tgt_lang}.\n"
             "CRITICAL INSTRUCTIONS:\n"
@@ -46,6 +34,19 @@ class LLMTranslationAgent:
             "4. Glossary: Use the provided terms consistently.\n\n"
             "Glossary:\n{glossary}\n\n"
             "Text to translate ({src_lang} -> {tgt_lang}):\n{text}"
+        )
+
+    def _create_agent(self) -> Agent:
+        """Creates a fresh Agent instance for a thread-safe invocation."""
+        return Agent(
+            model=OpenAIModel(
+                client_args={
+                    "api_key": settings.recognizer_model_api_key,
+                    "base_url": settings.provider_base_url,
+                    "timeout": settings.recognizer_modelizer_model_timeout,
+                },
+                model_id=self.model_id,
+            )
         )
 
     @observe(name="translator_agent")
@@ -63,7 +64,8 @@ class LLMTranslationAgent:
 
         try:
             logger.info(f"[agent:translator] Translating {len(text)} chars using {self.model_id}")
-            result = self.agent(prompt, structured_output_model=TranslationResult)
+            agent = self._create_agent()
+            result = agent(prompt, structured_output_model=TranslationResult)
             return result.structured_output.translated_text
         except Exception as e:
             logger.error(f"[agent:translator] Translation failed: {e}")

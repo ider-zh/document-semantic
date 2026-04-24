@@ -113,19 +113,39 @@ class AdvancedDocxRenderer:
 
     def _render_equation(self, elem, tag: str, template: SemanticTemplate, count: int):
         style_name = tag if tag in template.styles else "Normal"
-        # In Word, we often use a table with 1 row, 2 columns for numbered equations
-        # Col 1: Equation (centered), Col 2: (1) (right-aligned)
         
-        # For now, simple centered paragraph with numbering
-        p = self._doc.add_paragraph(style=style_name)
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Try to find image
+        img_path = None
+        if self.resources_dir and hasattr(elem.content, "image_source") and elem.content.image_source:
+            rel_path = elem.content.image_source.path
+            img_path = self.resources_dir / rel_path
+
+        # Standard academic style for numbered equations: a table with 1 row, 2 columns
+        # Col 1: Equation (Centered), Col 2: Number (Right-aligned)
+        table = self._doc.add_table(rows=1, cols=2)
+        table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        table.autofit = False
+        table.columns[0].width = Inches(5.0)
+        table.columns[1].width = Inches(0.5)
         
-        math_text = elem.content.math_content
-        p.add_run(math_text)
+        cell_eq = table.cell(0, 0)
+        cell_num = table.cell(0, 1)
         
-        # Add numbering (right aligned tab is better, but let's do simple)
-        # Using a specialized style for equations is recommended in real templates
-        p.add_run(f" \t ({count})") # \t works if tab stops are set in style
+        self._remove_cell_borders(cell_eq)
+        self._remove_cell_borders(cell_num)
+        
+        p_eq = cell_eq.paragraphs[0]
+        p_eq.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        if img_path and img_path.exists():
+            run = p_eq.add_run()
+            run.add_picture(str(img_path), height=Pt(30)) 
+        else:
+            p_eq.add_run(elem.content.math_content)
+            
+        p_num = cell_num.paragraphs[0]
+        p_num.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p_num.add_run(f"({count})")
 
     def _render_table(self, elem, tag: str, template: SemanticTemplate, count: int):
         style_name = tag if tag in template.styles else "Normal"
@@ -332,19 +352,39 @@ class AdvancedDocxRenderer:
         tag = ann_elem.semantic_tag
         elem = ann_elem.element
         style_name = tag if tag in template.styles else "Normal"
-        
+
         if elem.type in ("title", "paragraph"):
             p = self._doc.add_paragraph(style=style_name)
             inlines = []
-            if elem.type == "title": inlines = elem.content.title_content or []
-            else: inlines = elem.content.paragraph_content or []
-            
+            if elem.type == "title":
+                inlines = elem.content.title_content or []
+            else:
+                inlines = elem.content.paragraph_content or []
+
             for inline in inlines:
-                run = p.add_run(inline.content)
-                if inline.type == "equation_inline":
-                    run.font.italic = True
-                    run.font.name = template.styles.get(tag, DocxStyleConfig()).font or "Times New Roman"
-                    
+                # Check for inline equation image
+                img_path = None
+                if self.resources_dir and hasattr(inline, "image_source") and inline.image_source:
+                    img_path = self.resources_dir / inline.image_source.path
+
+                if img_path and img_path.exists():
+                    run = p.add_run()
+                    # Inline images height should match text
+                    run.add_picture(str(img_path), height=Pt(11))
+                else:
+                    text = inline.content
+                    if inline.type == "text":
+                        text = re.sub(r"!\[.*?\]\((.*?)\)", r"\1", text)
+                        text = re.sub(r"\[.*?\]\((.*?)\)", r"\1", text)
+
+                    run = p.add_run(text)
+                    if inline.type == "equation_inline":
+                        # Use Cambria Math for a more formula-like look if no image
+                        run.font.name = "Cambria Math"
+                        # For LaTeX text, wrapping in $ is more standard
+                        if not text.startswith("$"):
+                            run.text = f"${text}$"
+
             # Apply text transform
             config = template.styles.get(tag)
             if config and config.text_transform == "uppercase":

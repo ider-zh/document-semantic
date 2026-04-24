@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from document_semantic.agents.refinement_agent import LLMRefinementAgent
+from document_semantic.core.config import settings
 from document_semantic.models.mineru_content import MinerUContentList, MinerUElement
 from document_semantic.transform.chunker import Chunker
 from document_semantic.transform.protector import Protector, ProtectionVerificationError
@@ -18,26 +20,35 @@ class ContentRefinementWorkflow:
         self,
         refinement_agent: LLMRefinementAgent,
         chunk_size: int = 4000,
-        max_retries: int = 3
+        max_retries: int = 3,
+        parallel_chunks: int | None = None,
     ):
         self.agent = refinement_agent
         self.chunker = Chunker(max_chars=chunk_size)
         self.max_retries = max_retries
+        self.parallel_chunks = parallel_chunks or settings.parallel_chunks
 
     def process_document(self, content: MinerUContentList) -> MinerUContentList:
         """Main entry point for document refinement."""
         elements = content.root
-        
+
         # 1. Chunking
         chunks = self.chunker.chunk(elements)
         logger.info(f"[workflow:refinement] Document split into {len(chunks)} chunks")
-        
+
+        # 2. Parallel processing of chunks
+        def process_single_chunk(i_chunk):
+            i, chunk_elements = i_chunk
+            logger.info(f"[workflow:refinement] Processing chunk {i + 1}/{len(chunks)}")
+            return self._process_chunk(chunk_elements)
+
+        with ThreadPoolExecutor(max_workers=self.parallel_chunks) as executor:
+            results = list(executor.map(process_single_chunk, enumerate(chunks)))
+
         processed_elements = []
-        for i, chunk_elements in enumerate(chunks):
-            logger.info(f"[workflow:refinement] Processing chunk {i+1}/{len(chunks)}")
-            refined_chunk = self._process_chunk(chunk_elements)
-            processed_elements.extend(refined_chunk)
-            
+        for chunk_result in results:
+            processed_elements.extend(chunk_result)
+
         return MinerUContentList(root=processed_elements)
 
     def _process_chunk(self, elements: List[MinerUElement]) -> List[MinerUElement]:

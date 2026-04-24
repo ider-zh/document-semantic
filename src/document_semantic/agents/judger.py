@@ -26,22 +26,25 @@ class LLMJudgerAgent:
 
     def __init__(self, model_id: str | None = None, prompt_template: str | None = None):
         self.model_id = model_id or settings.recognizer_model_id
-        self.agent = Agent(
-            model=OpenAIModel(
-                client_args={
-                    "api_key": settings.recognizer_model_api_key,
-                    "base_url": settings.recognizer_model_provider_url,
-                    "timeout": settings.recognizer_modelizer_model_timeout,
-                },
-                model_id=self.model_id,
-            )
-        )
         self.prompt_template = prompt_template or (
             "You are a professional quality editor. You are provided with the original text (protected with placeholders) and several translation candidates.\n"
             "Evaluate each candidate based on accuracy, fluency, terminology consistency, and protection integrity (placeholders should be preserved exactly).\n\n"
             "Original Text:\n{original}\n\n"
             "Translation Candidates:\n{candidates}\n\n"
             "Choose the best candidate index (0 to {max_idx}), or -1 if none are acceptable.\n"
+        )
+
+    def _create_agent(self) -> Agent:
+        """Creates a fresh Agent instance for thread-safe invocation."""
+        return Agent(
+            model=OpenAIModel(
+                client_args={
+                    "api_key": settings.recognizer_model_api_key,
+                    "base_url": settings.provider_base_url,
+                    "timeout": settings.recognizer_modelizer_model_timeout,
+                },
+                model_id=self.model_id,
+            )
         )
 
     @observe(name="judger_agent")
@@ -55,11 +58,14 @@ class LLMJudgerAgent:
 
         try:
             logger.info(f"[agent:judger] Judging {len(candidates)} candidates using {self.model_id}")
-            result = self.agent(prompt, structured_output_model=JudgerResult)
+            agent = self._create_agent()
+            result = agent(prompt, structured_output_model=JudgerResult)
             idx = result.structured_output.best_candidate_index
             if -1 <= idx < len(candidates):
                 return idx
             return -1
         except Exception as e:
             logger.error(f"[agent:judger] Judging failed: {e}")
+            return -1
+
             return -1

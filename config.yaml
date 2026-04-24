@@ -11,6 +11,9 @@ verbosity: preview
 # Possible values: DEBUG, INFO, WARNING, ERROR
 log_level: INFO
 
+# Parallel processing
+parallel_chunks: 4
+
 # Processor output settings
 output_markdown: true
 output_resources: true
@@ -30,8 +33,6 @@ suppress_warnings: []
 
 recognizer_model_id: 'qwen3.5-9b'
 # recognizer_model_id: 'minimax-m2.7'
-recognizer_model_provider_url: 'https://api.toop.ai/v1'
 
-recognizer_model_id: 'qwen3.5-9b'
 # recognizer_model_id: 'minimax-m2.7'
-recognizer_model_provider_url: 'https://api.toop.ai/v1'
+provider_base_url: 'https://api.toop.ai/v1'

@@ -72,6 +72,10 @@ class Settings(BaseSettings):
         default=constants.DEFAULT_LOG_LEVEL,
         validation_alias=AliasChoices("log_level", constants.ENV_LOG_LEVEL),
     )
+    parallel_chunks: int = Field(
+        default=constants.DEFAULT_PARALLEL_CHUNKS,
+        validation_alias=AliasChoices("parallel_chunks", constants.ENV_PARALLEL_CHUNKS),
+    )
 
     # MinerU-specific settings
     mineru_token: str | None = Field(
@@ -96,9 +100,9 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("recognizer_model_id", constants.ENV_RECOGNIZER_MODEL_ID),
     )
 
-    recognizer_model_provider_url: str | None = Field(
+    provider_base_url: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("recognizer_model_provider_url", constants.ENV_RECOGNIZER_MODEL_PROVIDER_URL),
+        validation_alias=AliasChoices("provider_base_url", constants.ENV_PROVIDER_BASE_URL),
     )
 
     recognizer_model_api_key: str | None = Field(

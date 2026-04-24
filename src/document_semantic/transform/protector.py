@@ -40,7 +40,7 @@ class Protector:
         lines = []
 
         # We need unique IDs within this protection session
-        counters = {"EQ": 0, "IMG": 0, "TBL": 0, "CODE": 0, "REF": 0, "INLINE_EQ": 0}
+        counters = {"EQ": 0, "IMG": 0, "TBL": 0, "CODE": 0, "REF": 0, "INLINE_EQ": 0, "GEN": 0}
 
         def _get_id(tag: str) -> str:
             counters[tag] += 1
@@ -49,6 +49,15 @@ class Protector:
         for elem in elements:
             e_type = elem.type
             content = elem.content
+
+            if e_type in ("page_header", "page_footer"):
+                # Headers and footers usually shouldn't be part of the translatable flow
+                # as they are artifacts of pagination. We can either protect them as GEN
+                # or just ignore them. Let's protect them to ensure they are restored.
+                p_id = _get_id("GEN")
+                mapping[p_id] = elem
+                lines.append(f"<{p_id}/>")
+                continue
 
             if e_type == "title":
                 assert isinstance(content, MinerUTitleContent)
@@ -199,7 +208,19 @@ class Protector:
                     current_paragraph_inlines.append(original)
             else:
                 # Plain text. Might contain multiple paragraphs.
-                lines = token.split("\n\n")
+                # LLM might have wrapped placeholders in Markdown syntax like ![..](<P:IMG_1/>)
+                # or [..](<P:REF_1/>). We should have already split by placeholders, 
+                # but the text between them might contain leftover brackets/parens.
+                
+                # Simple cleanup: if this token is just '[' or ']' or '![' or ']' 
+                # and it's adjacent to a placeholder, it might be hallucinated syntax.
+                # However, re.split already separated them. 
+                # Let's just strip common md artifacts if they are very short and at the edges.
+                line_text = token
+                if line_text.strip() in ("!", "![", "]", "(", ")", "[]", "()"):
+                    continue
+
+                lines = line_text.split("\n\n")
                 for i, line in enumerate(lines):
                     line = line.strip()
                     if not line:
