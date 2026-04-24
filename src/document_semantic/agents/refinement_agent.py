@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from langfuse.decorators import observe
+from langfuse import observe
 from langfuse.openai import openai
 from pydantic import BaseModel, Field
 from strands import Agent
