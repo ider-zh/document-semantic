@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from langfuse.decorators import observe
+from langfuse.openai import openai
 from pydantic import BaseModel, Field
 from strands import Agent
 from strands.models.openai import OpenAIModel
@@ -42,6 +44,7 @@ class LLMJudgerAgent:
             "Choose the best candidate index (0 to {max_idx}), or -1 if none are acceptable.\n"
         )
 
+    @observe(name="judger_agent")
     def judge(self, original: str, candidates: list[str]) -> int:
         """Returns the index of the best candidate."""
         if not candidates:

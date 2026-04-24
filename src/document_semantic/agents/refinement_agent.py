@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from langfuse.decorators import observe
+from langfuse.openai import openai
 from pydantic import BaseModel, Field
 from strands import Agent
 from strands.models.openai import OpenAIModel
@@ -39,6 +41,7 @@ class LLMRefinementAgent:
         )
         self.task_description = task_description
 
+    @observe(name="refinement_agent")
     def refine(self, text: str, context: Dict[str, Any]) -> RefinementResult:
         """Refines text based on the configured task."""
         prompt = (

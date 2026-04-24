@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from langfuse.decorators import observe
+from langfuse.openai import openai
 from pydantic import BaseModel, Field
 from strands import Agent
 from strands.models.openai import OpenAIModel
@@ -45,6 +47,7 @@ class LLMGlossaryExtractor:
             "Text:\n{text}"
         )
 
+    @observe(name="glossary_extractor")
     def extract(self, text: str, src_lang: str = "Auto", tgt_lang: str = "Chinese") -> dict[str, str]:
         """Extracts terminology and returns a dict mapping source to target terms."""
         prompt = self.prompt_template.format(src_lang=src_lang, tgt_lang=tgt_lang, text=text)

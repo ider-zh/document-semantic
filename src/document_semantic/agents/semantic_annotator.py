@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import List, Optional
 
+from langfuse.decorators import observe
+from langfuse.openai import openai
 from pydantic import BaseModel, Field
 from strands import Agent
 from strands.models.openai import OpenAIModel
@@ -42,6 +44,7 @@ class SemanticAnnotatorAgent:
             )
         )
 
+    @observe(name="semantic_annotator_agent")
     def annotate(self, elements: List[MinerUElement], template: SemanticTemplate) -> AnnotatedMinerUContentList:
         """Annotates a list of elements using the provided template."""
         if not elements:
