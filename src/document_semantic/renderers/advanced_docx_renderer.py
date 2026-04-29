@@ -113,38 +113,28 @@ class AdvancedDocxRenderer:
 
     def _render_equation(self, elem, tag: str, template: SemanticTemplate, count: int):
         style_name = tag if tag in template.styles else "Normal"
-        
-        # Try to find image
-        img_path = None
-        if self.resources_dir and hasattr(elem.content, "image_source") and elem.content.image_source:
-            rel_path = elem.content.image_source.path
-            img_path = self.resources_dir / rel_path
 
-        # Standard academic style for numbered equations: a table with 1 row, 2 columns
-        # Col 1: Equation (Centered), Col 2: Number (Right-aligned)
-        table = self._doc.add_table(rows=1, cols=2)
-        table.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        table.autofit = False
-        table.columns[0].width = Inches(5.0)
-        table.columns[1].width = Inches(0.5)
-        
-        cell_eq = table.cell(0, 0)
-        cell_num = table.cell(0, 1)
-        
-        self._remove_cell_borders(cell_eq)
-        self._remove_cell_borders(cell_num)
-        
-        p_eq = cell_eq.paragraphs[0]
+        # Render equation as OMML (native Word math), not image
+        # Full-width centered paragraph for the equation
+        p_eq = self._doc.add_paragraph(style=style_name)
         p_eq.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        if img_path and img_path.exists():
-            run = p_eq.add_run()
-            run.add_picture(str(img_path), height=Pt(30)) 
+
+        latex = getattr(elem.content, "math_content", "")
+        if latex:
+            try:
+                from document_semantic.utils.mathml_to_omml import insert_omml_block
+                insert_omml_block(p_eq, latex)
+            except Exception as e:
+                logger.warning(f"[renderer:advanced_docx] OMML conversion failed, falling back to text: {e}")
+                p_eq.add_run(latex)
         else:
-            p_eq.add_run(elem.content.math_content)
-            
-        p_num = cell_num.paragraphs[0]
+            p_eq.add_run("[equation]")
+
+        # Equation number in a separate right-aligned paragraph with no spacing
+        p_num = self._doc.add_paragraph(style=style_name)
         p_num.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p_num.paragraph_format.space_before = Pt(0)
+        p_num.paragraph_format.space_after = Pt(6)
         p_num.add_run(f"({count})")
 
     def _render_table(self, elem, tag: str, template: SemanticTemplate, count: int):
@@ -320,8 +310,12 @@ class AdvancedDocxRenderer:
         par_fmt.space_before = Pt(config.space_before)
         par_fmt.space_after = Pt(config.space_after)
         par_fmt.line_spacing = config.line_spacing
-        par_fmt.first_line_indent = Pt(config.indent_first)
-        par_fmt.left_indent = Pt(config.indent_left)
+        # Only set indentation if explicitly configured (non-zero)
+        # Setting Pt(0) can cause unwanted hanging indents in python-docx
+        if config.indent_first > 0:
+            par_fmt.first_line_indent = Pt(config.indent_first)
+        if config.indent_left > 0:
+            par_fmt.left_indent = Pt(config.indent_left)
 
     def _determine_section_type(self, tag: str, current: str) -> str:
         if tag in ("paper_title", "author_info"):
@@ -362,28 +356,20 @@ class AdvancedDocxRenderer:
                 inlines = elem.content.paragraph_content or []
 
             for inline in inlines:
-                # Check for inline equation image
-                img_path = None
-                if self.resources_dir and hasattr(inline, "image_source") and inline.image_source:
-                    img_path = self.resources_dir / inline.image_source.path
-
-                if img_path and img_path.exists():
-                    run = p.add_run()
-                    # Inline images height should match text
-                    run.add_picture(str(img_path), height=Pt(11))
-                else:
-                    text = inline.content
-                    if inline.type == "text":
-                        text = re.sub(r"!\[.*?\]\((.*?)\)", r"\1", text)
-                        text = re.sub(r"\[.*?\]\((.*?)\)", r"\1", text)
-
-                    run = p.add_run(text)
-                    if inline.type == "equation_inline":
-                        # Use Cambria Math for a more formula-like look if no image
+                if inline.type == "equation_inline":
+                    # Render as native OMML inline equation from LaTeX source
+                    try:
+                        from document_semantic.utils.mathml_to_omml import insert_omml_inline
+                        insert_omml_inline(p, inline.content)
+                    except Exception as e:
+                        logger.warning(f"[renderer:advanced_docx] Inline OMML failed, falling back to text: {e}")
+                        run = p.add_run(f"${inline.content}$")
                         run.font.name = "Cambria Math"
-                        # For LaTeX text, wrapping in $ is more standard
-                        if not text.startswith("$"):
-                            run.text = f"${text}$"
+                elif inline.type == "text":
+                    text = inline.content
+                    text = re.sub(r"!\[.*?\]\((.*?)\)", r"\1", text)
+                    text = re.sub(r"\[.*?\]\((.*?)\)", r"\1", text)
+                    run = p.add_run(text)
 
             # Apply text transform
             config = template.styles.get(tag)
