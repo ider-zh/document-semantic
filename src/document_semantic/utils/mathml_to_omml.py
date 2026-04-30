@@ -229,7 +229,10 @@ def _convert_msub(elem: etree._Element) -> etree._Element:
         synthetic.append(children[1])
         return _convert_nary(synthetic, "und")
 
-    s = etree.Element(_omml_tag("s"))
+    s = etree.Element(_omml_tag("sSub"))
+    sPr = etree.SubElement(s, _omml_tag("sSubPr"))
+    ctrlPr = etree.SubElement(sPr, _omml_tag("ctrlPr"))
+    _add_run_props(ctrlPr)
     # Base
     e = etree.SubElement(s, _omml_tag("e"))
     _append_children(e, [_convert(children[0])])
@@ -240,7 +243,7 @@ def _convert_msub(elem: etree._Element) -> etree._Element:
 
 
 def _convert_msup(elem: etree._Element) -> etree._Element:
-    """msup → m:nary if base is n-ary operator, else m:s with sub1Hide (superscript only)."""
+    """msup → m:nary if base is n-ary operator, else m:sSup (superscript only)."""
     children = list(elem)
     if len(children) < 2:
         return _convert(children[0]) if children else None
@@ -253,10 +256,8 @@ def _convert_msup(elem: etree._Element) -> etree._Element:
         synthetic.append(children[1])
         return _convert_nary(synthetic, "ovr")
 
-    s = etree.Element(_omml_tag("s"))
-    sPr = etree.SubElement(s, _omml_tag("sPr"))
-    # Hide sub position to make it a superscript
-    sPr.set(_omml_tag("sub1Hide"), "1")
+    s = etree.Element(_omml_tag("sSup"))
+    sPr = etree.SubElement(s, _omml_tag("sSupPr"))
     ctrlPr = etree.SubElement(sPr, _omml_tag("ctrlPr"))
     _add_run_props(ctrlPr)
     # Base
@@ -269,7 +270,7 @@ def _convert_msup(elem: etree._Element) -> etree._Element:
 
 
 def _convert_msubsup(elem: etree._Element) -> etree._Element:
-    """msubsup → m:nary if base is n-ary operator, else m:s (both sub and sup)."""
+    """msubsup → m:nary if base is n-ary operator, else m:sSubSup (both sub and sup)."""
     children = list(elem)
     if len(children) < 3:
         # Fall back to msub if only 2 children
@@ -284,7 +285,10 @@ def _convert_msubsup(elem: etree._Element) -> etree._Element:
         synthetic.append(children[2])
         return _convert_nary(synthetic, "subSup")
 
-    s = etree.Element(_omml_tag("s"))
+    s = etree.Element(_omml_tag("sSubSup"))
+    sPr = etree.SubElement(s, _omml_tag("sSubSupPr"))
+    ctrlPr = etree.SubElement(sPr, _omml_tag("ctrlPr"))
+    _add_run_props(ctrlPr)
     # Base
     e = etree.SubElement(s, _omml_tag("e"))
     _append_children(e, [_convert(children[0])])
@@ -312,12 +316,10 @@ def _convert_mfrac(elem: etree._Element) -> etree._Element:
     if len(children) >= 1:
         _append_children(num, _convert_mrow_contents(children[0]))
 
-    # Denominator - only create if has content
+    # Denominator
+    den = etree.SubElement(f, _omml_tag("den"))
     if len(children) >= 2:
-        den_content = _convert_mrow_contents(children[1])
-        if den_content:
-            den = etree.SubElement(f, _omml_tag("den"))
-            _append_children(den, den_content)
+        _append_children(den, _convert_mrow_contents(children[1]))
 
     return f
 
@@ -370,6 +372,9 @@ def _convert_msqrt(elem: etree._Element) -> etree._Element:
     ctrlPr = etree.SubElement(radPr, _omml_tag("ctrlPr"))
     _add_run_props(ctrlPr)
 
+    # degree (mandatory for m:rad)
+    deg = etree.SubElement(rad, _omml_tag("deg"))
+
     # Convert the base content (inside the sqrt)
     e = etree.SubElement(rad, _omml_tag("e"))
     children = list(elem)
@@ -406,25 +411,19 @@ def _convert_nary(elem: etree._Element, lim_loc: str) -> etree._Element:
     _add_run_props(ctrlPr)
 
     # Sub (lower limit)
+    sub = etree.SubElement(nary, _omml_tag("sub"))
     if lim_loc in ("subSup", "und") and len(children) >= 2:
-        sub_content = _convert_mrow_contents(children[1])
-        if sub_content:
-            sub = etree.SubElement(nary, _omml_tag("sub"))
-            _append_children(sub, sub_content)
+        _append_children(sub, _convert_mrow_contents(children[1]))
 
     # Sup (upper limit)
+    sup = etree.SubElement(nary, _omml_tag("sup"))
     if lim_loc == "subSup" and len(children) >= 3:
-        sup_content = _convert_mrow_contents(children[2])
-        if sup_content:
-            sup = etree.SubElement(nary, _omml_tag("sup"))
-            _append_children(sup, sup_content)
+        _append_children(sup, _convert_mrow_contents(children[2]))
     elif lim_loc == "ovr" and len(children) >= 2:
-        sup_content = _convert_mrow_contents(children[1])
-        if sup_content:
-            sup = etree.SubElement(nary, _omml_tag("sup"))
-            _append_children(sup, sup_content)
+        _append_children(sup, _convert_mrow_contents(children[1]))
 
-    # e (body — typically empty for standalone n-ary, but only create if has content)
+    # e (body — typically empty for standalone n-ary)
+    e = etree.SubElement(nary, _omml_tag("e"))
     # Check if there are more children beyond the limits that form the body
     body_start_idx = 3 if lim_loc == "subSup" else 2
     if len(children) > body_start_idx:
@@ -432,9 +431,7 @@ def _convert_nary(elem: etree._Element, lim_loc: str) -> etree._Element:
         for idx in range(body_start_idx, len(children)):
             e_content.extend(_convert_mrow_contents(children[idx]))
         if e_content:
-            e = etree.SubElement(nary, _omml_tag("e"))
             _append_children(e, e_content)
-    # If no body content, don't create empty m:e - it causes Word to fail
 
     return nary
 
@@ -471,17 +468,14 @@ def _add_run_props(parent: etree._Element) -> None:
     rFonts.set(f"{{{WORD_NS}}}eastAsia", "Cambria Math")
 
 
-def _make_run(text: str, italic: bool = False, plain: bool = False) -> etree._Element | None:
+def _make_run(text: str, italic: bool = False, plain: bool = False) -> etree._Element:
     """Create an OMML run element (m:r)."""
-    # Skip creating runs with empty text
-    if not text:
-        return None
     r = etree.Element(_omml_tag("r"))
     rPr = etree.SubElement(r, _omml_tag("rPr"))
     sty = etree.SubElement(rPr, _omml_tag("sty"))
     sty.set(_omml_tag("val"), "i" if italic else "p")
     t = etree.SubElement(r, _omml_tag("t"))
-    t.text = text
+    t.text = text if text else ""
     return r
 
 
@@ -551,9 +545,8 @@ def _absorb_nary_bodies(results: list[etree._Element | None]) -> None:
             absorbed = True
 
         if not absorbed:
-            # No content was absorbed - leave m:e empty
-            # This is valid OMML; Word will render it as just the operator
-            pass
+            # Ensure m:e has at least an empty run so it's valid OMML
+            _append_children(e_el, [_make_run("", plain=True)])
 
         i += 1
 
