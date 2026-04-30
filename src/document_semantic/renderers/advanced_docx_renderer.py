@@ -55,16 +55,19 @@ class AdvancedDocxRenderer:
         for ann_elem in annotated_content:
             tag = ann_elem.semantic_tag
             elem = ann_elem.element
-            
+
             # Section switching logic
             new_section_type = self._determine_section_type(tag, current_section_type)
             if new_section_type != current_section_type:
                 self._add_section_break(template, new_section_type)
                 current_section_type = new_section_type
-            
+
             # Element specific rendering
             if elem.type == "image":
-                fig_count += 1
+                # Only count images that have captions for figure numbering
+                has_caption = hasattr(elem.content, "image_caption") and elem.content.image_caption
+                if has_caption:
+                    fig_count += 1
                 self._render_image(elem, tag, template, fig_count)
             elif elem.type == "equation_interline":
                 eq_count += 1
@@ -80,35 +83,56 @@ class AdvancedDocxRenderer:
         return output_path
 
     def _render_image(self, elem, tag: str, template: SemanticTemplate, count: int):
+        """Render an image element.
+
+        The count parameter is the sequential figure number counter,
+        but we only assign figure numbers to images that have captions.
+        """
         style_name = tag if tag in template.styles else "Normal"
         img_path = None
-        
+
         # Try to find actual image file
         if self.resources_dir and hasattr(elem.content, "image_source") and elem.content.image_source:
             # MinerU image path is usually relative to the ZIP root, e.g., 'images/abc.jpg'
             # Our resources_dir should be the parent of 'images'
             rel_path = elem.content.image_source.path
             img_path = self.resources_dir / rel_path
-            
+
         p = self._doc.add_paragraph(style=style_name)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        if img_path and img_path.exists():
-            run = p.add_run()
-            # Try to fit to column width (roughly)
-            # Default to 5 inches or max available
-            run.add_picture(str(img_path), width=Inches(3.2)) # Standard column width approx
-        else:
-            p.add_run(f"[Image: {img_path or 'not found'}]")
 
-        # Handle Caption (if tag implies it or check elem.content)
+        if img_path and img_path.exists():
+            try:
+                run = p.add_run()
+                run.add_picture(str(img_path), width=Inches(3.2))
+            except Exception as e:
+                logger.warning(f"[renderer:advanced_docx] Failed to add image: {e}")
+                p.add_run(f"[Image: {img_path.name}]")
+        else:
+            if img_path:
+                p.add_run(f"[Image not found: {img_path.name}]")
+            else:
+                p.add_run("[Image: no source]")
+
+        # Handle Caption - only render if there's a caption
         caption_text = ""
         if hasattr(elem.content, "image_caption") and elem.content.image_caption:
             caption_text = self._extract_inline_list_text(elem.content.image_caption)
-        
+
         if caption_text:
+            # Extract figure number from caption (e.g., "Fig.1: ..." or "Fig. 1: ...")
+            import re
+            match = re.search(r'^\s*Fig\.?\s*\d+[:\s]*', caption_text, re.IGNORECASE)
+            if match:
+                # Caption already starts with figure number, use it as-is
+                display_caption = caption_text
+            else:
+                # No figure number in caption, prepend sequential count
+                fig_num = str(count)
+                display_caption = f"Fig. {fig_num}. {caption_text}"
+
             cap_p = self._doc.add_paragraph(style="figure_caption" if "figure_caption" in template.styles else style_name)
-            cap_p.add_run(f"Fig. {count}. {caption_text}")
+            cap_p.add_run(display_caption)
             cap_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     def _render_equation(self, elem, tag: str, template: SemanticTemplate, count: int):
@@ -207,61 +231,71 @@ class AdvancedDocxRenderer:
 
     def _set_three_line_style(self, table):
         """Applies academic three-line style to a docx table."""
-        # Top border of first row
-        self._set_cell_border(table.cell(0, 0), top={"sz": 12, "val": "single", "color": "000000"})
-        # Bottom border of first row (header separator)
-        self._set_cell_border(table.cell(0, 0), bottom={"sz": 6, "val": "single", "color": "000000"})
-        # Bottom border of last row
-        self._set_cell_border(table.cell(-1, 0), bottom={"sz": 12, "val": "single", "color": "000000"})
-
-        # To apply to whole row, we need to loop cells
+        num_rows = len(table.rows)
         num_cols = len(table.columns)
-        for c in range(num_cols):
-            self._set_cell_border(table.cell(0, c), top={"sz": 12, "val": "single", "color": "000000"})
-            self._set_cell_border(table.cell(0, c), bottom={"sz": 6, "val": "single", "color": "000000"})
-            self._set_cell_border(table.cell(-1, c), bottom={"sz": 12, "val": "single", "color": "000000"})
+        
+        if num_rows == 0 or num_cols == 0:
+            return
 
-        # Remove inner borders? "Table Grid" has them, we should use a style without them or remove manually.
-        # Actually, let's remove ALL default borders first then apply top/bottom.
+        # Remove inner borders first
         for row in table.rows:
             for cell in row.cells:
                 self._remove_cell_borders(cell)
         
+        # Apply borders
         for c in range(num_cols):
+            # Top border of first row
             self._set_cell_border(table.cell(0, c), top={"sz": 12, "val": "single", "color": "000000"})
+            # Bottom border of first row (header separator)
             self._set_cell_border(table.cell(0, c), bottom={"sz": 6, "val": "single", "color": "000000"})
-            self._set_cell_border(table.cell(-1, c), bottom={"sz": 12, "val": "single", "color": "000000"})
+            # Bottom border of last row
+            self._set_cell_border(table.cell(num_rows - 1, c), bottom={"sz": 12, "val": "single", "color": "000000"})
 
     def _remove_cell_borders(self, cell):
         tcPr = cell._tc.get_or_add_tcPr()
-        tcBorders = parse_xml(f'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-                             f'<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>'
-                             f'<w:insideH w:val="nil"/><w:insideV w:val="nil"/>'
-                             f'</w:tcBorders>')
-        tcPr.append(tcBorders)
+        tcBorders = tcPr.find(qn('w:tcBorders'))
+        if tcBorders is None:
+            tcBorders = parse_xml(f'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+            # Insert before w:shd if present, else append
+            shd = tcPr.find(qn('w:shd'))
+            if shd is not None:
+                shd.addprevious(tcBorders)
+            else:
+                tcPr.append(tcBorders)
+        
+        for edge in ('top', 'left', 'bottom', 'right', 'tl2br', 'tr2bl'):
+            edge_tag = qn(f'w:{edge}')
+            element = tcBorders.find(edge_tag)
+            if element is None:
+                element = parse_xml(f'<w:{edge} xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+                tcBorders.append(element)
+            element.set(qn('w:val'), 'nil')
 
     def _set_cell_border(self, cell, **kwargs):
         """
         Set cell borders.
-        Usage: _set_cell_border(cell, top={"sz": 12, "val": "single", "color": "#FF0000"}, ...)
+        Usage: _set_cell_border(cell, top={"sz": 12, "val": "single", "color": "000000"}, ...)
         """
-        tc = cell._tc
-        tcPr = tc.get_or_add_tcPr()
+        tcPr = cell._tc.get_or_add_tcPr()
         tcBorders = tcPr.find(qn('w:tcBorders'))
         if tcBorders is None:
             tcBorders = parse_xml(f'<w:tcBorders xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
-            tcPr.append(tcBorders)
+            # Insert before w:shd if present, else append
+            shd = tcPr.find(qn('w:shd'))
+            if shd is not None:
+                shd.addprevious(tcBorders)
+            else:
+                tcPr.append(tcBorders)
 
-        for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
-            edge_data = kwargs.get(edge)
-            if edge_data:
-                tag = f'w:{edge}'
-                element = tcBorders.find(qn(tag))
+        for edge, props in kwargs.items():
+            if edge in ('top', 'left', 'bottom', 'right', 'tl2br', 'tr2bl'):
+                edge_tag = qn(f'w:{edge}')
+                element = tcBorders.find(edge_tag)
                 if element is None:
-                    element = parse_xml(f'<{tag} xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+                    element = parse_xml(f'<w:{edge} xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
                     tcBorders.append(element)
                 
-                for key, val in edge_data.items():
+                for key, val in props.items():
                     element.set(qn(f'w:{key}'), str(val))
 
     def _extract_inline_list_text(self, inlines: list) -> str:
@@ -335,7 +369,15 @@ class AdvancedDocxRenderer:
         cols = sectPr.xpath("./w:cols")
         if not cols:
             cols = parse_xml(f'<w:cols xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" />')
-            sectPr.append(cols)
+            # Insert before elements that must come after w:cols (vAlign, docGrid, etc.)
+            vAlign = sectPr.find(qn("w:vAlign"))
+            docGrid = sectPr.find(qn("w:docGrid"))
+            if vAlign is not None:
+                vAlign.addprevious(cols)
+            elif docGrid is not None:
+                docGrid.addprevious(cols)
+            else:
+                sectPr.append(cols)
         else:
             cols = cols[0]
             
@@ -355,21 +397,7 @@ class AdvancedDocxRenderer:
             else:
                 inlines = elem.content.paragraph_content or []
 
-            for inline in inlines:
-                if inline.type == "equation_inline":
-                    # Render as native OMML inline equation from LaTeX source
-                    try:
-                        from document_semantic.utils.mathml_to_omml import insert_omml_inline
-                        insert_omml_inline(p, inline.content)
-                    except Exception as e:
-                        logger.warning(f"[renderer:advanced_docx] Inline OMML failed, falling back to text: {e}")
-                        run = p.add_run(f"${inline.content}$")
-                        run.font.name = "Cambria Math"
-                elif inline.type == "text":
-                    text = inline.content
-                    text = re.sub(r"!\[.*?\]\((.*?)\)", r"\1", text)
-                    text = re.sub(r"\[.*?\]\((.*?)\)", r"\1", text)
-                    run = p.add_run(text)
+            self._render_inlines(p, inlines)
 
             # Apply text transform
             config = template.styles.get(tag)
@@ -377,9 +405,40 @@ class AdvancedDocxRenderer:
                 for run in p.runs:
                     run.text = run.text.upper()
         
+        elif elem.type == "list":
+            # Render list items as paragraphs for reference items
+            for list_item in elem.content.list_items:
+                p = self._doc.add_paragraph(style=style_name)
+                self._render_inlines(p, list_item.item_content)
+
+                # Apply text transform
+                config = template.styles.get(tag)
+                if config and config.text_transform == "uppercase":
+                    for run in p.runs:
+                        run.text = run.text.upper()
+
         elif elem.type == "equation_interline":
             p = self._doc.add_paragraph(elem.content.math_content, style=style_name)
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    def _render_inlines(self, paragraph, inlines: list):
+        """Render a list of inline elements into a paragraph."""
+        for inline in inlines:
+            if inline.type == "equation_inline":
+                # Render as native OMML inline equation from LaTeX source
+                try:
+                    from document_semantic.utils.mathml_to_omml import insert_omml_inline
+                    insert_omml_inline(paragraph, inline.content)
+                except Exception as e:
+                    logger.warning(f"[renderer:advanced_docx] Inline OMML failed, falling back to text: {e}")
+                    run = paragraph.add_run(f"${inline.content}$")
+                    run.font.name = "Cambria Math"
+            elif inline.type == "text":
+                text = inline.content
+                # Basic cleanup of markdown-style links/images if they leaked in
+                text = re.sub(r"!\[.*?\]\((.*?)\)", r"\1", text)
+                text = re.sub(r"\[.*?\]\((.*?)\)", r"\1", text)
+                paragraph.add_run(text)
 
     def _parse_unit(self, value: str):
         if value.endswith("mm"):

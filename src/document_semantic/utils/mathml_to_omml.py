@@ -80,8 +80,10 @@ def insert_omml_inline(paragraph, latex_str: str) -> None:
     """Insert an inline OMML equation (m:oMath) into a python-docx paragraph.
 
     The equation is appended at the end of the paragraph's current content.
+    In OpenXML, m:oMath can be a direct child of w:p.
     """
     omath = latex_to_omml(latex_str)
+    # Append the m:oMath element directly to the paragraph's XML element
     paragraph._element.append(omath)
 
 
@@ -113,7 +115,8 @@ def _convert(elem: etree._Element) -> etree._Element | None:
         "mfrac": _convert_mfrac,
         "munderover": lambda e: _convert_nary(e, "subSup"),
         "munder": lambda e: _convert_nary(e, "und"),
-        "mover": lambda e: _convert_nary(e, "ovr"),
+        "mover": _convert_mover,  # Special handler for accents vs n-ary
+        "msqrt": _convert_msqrt,  # Square root
         "mtable": _convert_mtable,
         "mspace": lambda e: None,
         "math": _convert_math,
@@ -208,6 +211,7 @@ def _is_nary_char(elem: etree._Element) -> str | None:
             if result:
                 return result
 
+    # mi, mn, mtext are NEVER n-ary operators
     return None
 
 
@@ -308,12 +312,72 @@ def _convert_mfrac(elem: etree._Element) -> etree._Element:
     if len(children) >= 1:
         _append_children(num, _convert_mrow_contents(children[0]))
 
-    # Denominator
-    den = etree.SubElement(f, _omml_tag("den"))
+    # Denominator - only create if has content
     if len(children) >= 2:
-        _append_children(den, _convert_mrow_contents(children[1]))
+        den_content = _convert_mrow_contents(children[1])
+        if den_content:
+            den = etree.SubElement(f, _omml_tag("den"))
+            _append_children(den, den_content)
 
     return f
+
+
+def _convert_mover(elem: etree._Element) -> etree._Element:
+    """mover → m:nary if base is n-ary operator, else m:acc (accent) or regular group.
+
+    This handles both:
+    - \\sum^{n} (n-ary operator with upper limit)
+    - \\hat{m} (accent)
+    """
+    children = list(elem)
+    if len(children) < 2:
+        return _convert(children[0]) if children else None
+
+    # Check if base is a n-ary operator character
+    nary_char = _is_nary_char(children[0])
+    if nary_char:
+        # It's a n-ary operator with upper limit
+        return _convert_nary(elem, "ovr")
+
+    # It's an accent (\hat, \bar, etc.) - render as group with accent
+    # For now, convert the base element (the accent itself will be in the second child)
+    # We handle this by converting the base and adding it as the content
+    # The accent character (like ^) becomes a regular run
+    container = etree.Element("CONTAINER")
+
+    # Convert the base (first child)
+    base = _convert(children[0])
+    if base is not None:
+        _append_children(container, [base])
+
+    # Add the accent as a separate run if it's an mo
+    if children[1].tag.split("}")[1] if "}" in children[1].tag else children[1].tag == "mo":
+        accent_text = _extract_text(children[1])
+        if accent_text:
+            accent_run = _make_run(accent_text, plain=True)
+            if accent_run is not None:
+                container.append(accent_run)
+
+    return container
+
+
+def _convert_msqrt(elem: etree._Element) -> etree._Element:
+    """msqrt → m:rad (radical/square root)."""
+    rad = etree.Element(_omml_tag("rad"))
+    radPr = etree.SubElement(rad, _omml_tag("radPr"))
+    # Hide the index (square root has no visible index)
+    radPr.set(_omml_tag("hideIdx"), "1")
+    ctrlPr = etree.SubElement(radPr, _omml_tag("ctrlPr"))
+    _add_run_props(ctrlPr)
+
+    # Convert the base content (inside the sqrt)
+    e = etree.SubElement(rad, _omml_tag("e"))
+    children = list(elem)
+    if children:
+        for child in children:
+            _append_children(e, [_convert(child)])
+
+    return rad
 
 
 def _convert_nary(elem: etree._Element, lim_loc: str) -> etree._Element:
@@ -342,19 +406,35 @@ def _convert_nary(elem: etree._Element, lim_loc: str) -> etree._Element:
     _add_run_props(ctrlPr)
 
     # Sub (lower limit)
-    sub = etree.SubElement(nary, _omml_tag("sub"))
     if lim_loc in ("subSup", "und") and len(children) >= 2:
-        _append_children(sub, _convert_mrow_contents(children[1]))
+        sub_content = _convert_mrow_contents(children[1])
+        if sub_content:
+            sub = etree.SubElement(nary, _omml_tag("sub"))
+            _append_children(sub, sub_content)
 
     # Sup (upper limit)
-    sup = etree.SubElement(nary, _omml_tag("sup"))
     if lim_loc == "subSup" and len(children) >= 3:
-        _append_children(sup, _convert_mrow_contents(children[2]))
+        sup_content = _convert_mrow_contents(children[2])
+        if sup_content:
+            sup = etree.SubElement(nary, _omml_tag("sup"))
+            _append_children(sup, sup_content)
     elif lim_loc == "ovr" and len(children) >= 2:
-        _append_children(sup, _convert_mrow_contents(children[1]))
+        sup_content = _convert_mrow_contents(children[1])
+        if sup_content:
+            sup = etree.SubElement(nary, _omml_tag("sup"))
+            _append_children(sup, sup_content)
 
-    # e (body — typically empty for standalone n-ary)
-    e = etree.SubElement(nary, _omml_tag("e"))
+    # e (body — typically empty for standalone n-ary, but only create if has content)
+    # Check if there are more children beyond the limits that form the body
+    body_start_idx = 3 if lim_loc == "subSup" else 2
+    if len(children) > body_start_idx:
+        e_content = []
+        for idx in range(body_start_idx, len(children)):
+            e_content.extend(_convert_mrow_contents(children[idx]))
+        if e_content:
+            e = etree.SubElement(nary, _omml_tag("e"))
+            _append_children(e, e_content)
+    # If no body content, don't create empty m:e - it causes Word to fail
 
     return nary
 
@@ -391,8 +471,11 @@ def _add_run_props(parent: etree._Element) -> None:
     rFonts.set(f"{{{WORD_NS}}}eastAsia", "Cambria Math")
 
 
-def _make_run(text: str, italic: bool = False, plain: bool = False) -> etree._Element:
+def _make_run(text: str, italic: bool = False, plain: bool = False) -> etree._Element | None:
     """Create an OMML run element (m:r)."""
+    # Skip creating runs with empty text
+    if not text:
+        return None
     r = etree.Element(_omml_tag("r"))
     rPr = etree.SubElement(r, _omml_tag("rPr"))
     sty = etree.SubElement(rPr, _omml_tag("sty"))
@@ -468,8 +551,9 @@ def _absorb_nary_bodies(results: list[etree._Element | None]) -> None:
             absorbed = True
 
         if not absorbed:
-            # Ensure m:e has at least an empty run so it's valid OMML
-            _append_children(e_el, [_make_run("", plain=True)])
+            # No content was absorbed - leave m:e empty
+            # This is valid OMML; Word will render it as just the operator
+            pass
 
         i += 1
 
