@@ -4,3 +4,7 @@ __pycache__/
 tests/docx/output/
 .ruff_cache/
 .mineru_cache
+.env
+.omc
+.inspect_xml
+.claudes

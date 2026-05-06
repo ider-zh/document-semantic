@@ -229,6 +229,46 @@ def _print_result_table(result):
     console.print(table)
 
 
+@app.command(name="test-visual")
+def test_visual_pipeline(
+    docx_path: Path = typer.Argument(..., help="Path to the DOCX file to visually test", exists=True, dir_okay=False),
+    model_id: str | None = typer.Option(None, "--model-id", "-m", help="Vision model to use (default: qwen-vl-max)"),
+    max_pages: int = typer.Option(3, "--max-pages", help="Maximum number of pages to analyze"),
+):
+    """Run visual QA on a DOCX using LibreOffice and a Vision LLM."""
+    try:
+        from document_semantic.agents.visual_tester import VisualTesterAgent
+        
+        rprint(
+            Panel(
+                f"Visual QA for [bold cyan]{docx_path}[/bold cyan]\n"
+                f"Model: [green]{model_id or 'qwen-vl-max'}[/green]",
+                title="Document Semantic Visual Tester",
+            )
+        )
+
+        agent = VisualTesterAgent(model_id=model_id)
+        result = agent.test_docx(docx_path, max_pages=max_pages)
+
+        table = Table(title="Visual QA Results")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Result", style="green" if result.is_format_correct else "red")
+        
+        table.add_row("Format Correct", "[bold green]Pass[/bold green]" if result.is_format_correct else "[bold red]Fail[/bold red]")
+        table.add_row("Confidence", f"{result.confidence_score}%")
+        table.add_row("Summary", result.analysis_summary)
+        
+        if result.issues_found:
+            table.add_row("Issues Found", "\n".join(f"- {issue}" for issue in result.issues_found))
+
+        console.print(table)
+
+    except Exception as e:
+        rprint(f"[bold red]Error:[/bold red] {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise typer.Exit(code=1)
+
 @app.command(name="config")
 def show_config(
     config_path: Path | None = typer.Option(None, "--config", "-c", help="Path to a custom config.yaml"),

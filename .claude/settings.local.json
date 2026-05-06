@@ -6,7 +6,9 @@
       "Bash(make test-docx:*)",
       "Bash(pytest --version)",
       "Bash(ls:*)",
-      "Bash(uv sync:*)"
+      "Bash(uv sync:*)",
+      "Bash(ruff check *)",
+      "Bash(git stash *)"
     ]
   }
 }

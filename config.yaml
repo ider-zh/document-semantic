@@ -31,7 +31,7 @@ recognizer_config: {}
 # Suppress specific warnings
 suppress_warnings: []
 
-recognizer_model_id: 'qwen3.5-9b'
+recognizer_model_id: 'qwen3.6-27b'
 # recognizer_model_id: 'minimax-m2.7'
 
 # recognizer_model_id: 'minimax-m2.7'

@@ -1,0 +1,73 @@
+{
+  "version": "1.0",
+  "resources": {
+    "formula": {
+      "1": {
+        "type": "block",
+        "content": "P _ {M} (x) = \\sum_ {i = 0} ^ {\\infty} 2 ^ {- | S _ {i} (x) |}",
+        "metadata": {
+          "math_type": "latex"
+        }
+      },
+      "2": {
+        "type": "inline",
+        "content": "( \\mathsf { x } _ { 1 } , \\mathsf { x } _ { 2 } , \\ldots , \\mathsf { x } _ { \\mathsf { n } } )",
+        "metadata": {}
+      },
+      "3": {
+        "type": "inline",
+        "content": "x _ { n + 1 0 }",
+        "metadata": {}
+      },
+      "4": {
+        "type": "inline",
+        "content": "( \\mathsf { x } _ { 1 } , \\mathsf { x } _ { 2 } , \\ldots , \\mathsf { x } _ { \\mathsf { n } } )",
+        "metadata": {}
+      },
+      "5": {
+        "type": "inline",
+        "content": "\\mathsf { n }",
+        "metadata": {}
+      },
+      "6": {
+        "type": "block",
+        "content": "\\operatorname {K t} (\\mathrm {x}) = \\min  \\left\\{\\ell (\\mathrm {p}) + \\log (\\text {t i m e} (\\mathrm {p})) \\colon \\mathrm {U} (\\mathrm {p}) = \\mathrm {x} \\right\\}",
+        "metadata": {
+          "math_type": "latex"
+        }
+      }
+    },
+    "code": {
+      "1": {
+        "type": "block",
+        "content": "for   \\mathbf{i} = 1  to n print 1",
+        "metadata": {}
+      }
+    },
+    "image": {
+      "1": {
+        "type": "block",
+        "content": "",
+        "file": "resources/images/image_1.jpg",
+        "metadata": {}
+      },
+      "2": {
+        "type": "block",
+        "content": "所罗门诺夫与蔡廷，2003",
+        "file": "resources/images/image_2.jpg",
+        "metadata": {}
+      },
+      "3": {
+        "type": "block",
+        "content": "",
+        "file": "resources/images/image_3.jpg",
+        "metadata": {}
+      }
+    }
+  },
+  "metadata": {
+    "source_path": "tests/docx/test_1.docx",
+    "parser": "mineru",
+    "processed_at": "2026-04-28T08:44:42.353793+00:00"
+  }
+}

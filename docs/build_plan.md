@@ -139,6 +139,7 @@ uv run document-semantic process tests/docx/test_2.docx tests/docx/output/cli_te
 以下是需要 debug 的流程, 你先找出问题原因, 然后提供修复方案
 uv run document-semantic process tests/docx/test_2.docx tests/docx/output/cli_test -p mineru --refine --translate English --template 
 输出文档 tests/docx/output/cli_test/output_jcst-v2.docx,
++ reference item 也缩进了, 什么原因?先找到原因, 然后提供修复方案
 + 图片缺失
 + 内容与 test_2.docx 不一致
 
